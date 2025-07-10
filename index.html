@@ -37,8 +37,9 @@
             </div>
 
             <div class="form-group">
-                <label for="date">預約日期 *</label>
-                <input type="date" id="date" name="date" required>
+                <label>預約日期 *</label>
+                <div class="date-buttons" id="dateButtons"></div>
+                <input type="hidden" id="dateInput" name="date" required>
                 <small class="hint">可預約未來7天內，週日不開放</small>
             </div>
 
@@ -88,6 +89,7 @@
         // LIFF 相關變數
         let liffProfile = null;
         let liffUserId = null;
+        let selectedDate = null;
 
         // 時段選項
         const timeSlots = {
@@ -95,66 +97,99 @@
             afternoon: ['13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30']
         };
 
+        // 星期對應
+        const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
         // 初始化 LIFF
         async function initializeLiff() {
             try {
-                await liff.init({ liffId: '2007724265-YJ80zrNX' }); // 請替換為實際的 LIFF ID
-                
-                if (liff.isLoggedIn()) {
-                    liffProfile = await liff.getProfile();
-                    liffUserId = liffProfile.userId;
-                    
-                    // 自動填入姓名
-                    document.getElementById('name').value = liffProfile.displayName || '';
-                    
-                    // 顯示用戶問候語
-                    document.getElementById('userGreeting').textContent = `您好，${liffProfile.displayName || '訪客'}！`;
-                } else {
-                    liff.login();
-                }
+                // 模擬 LIFF 環境（在實際環境中請使用真實的 LIFF）
+                console.log('Running in development mode without LIFF');
+                document.getElementById('userGreeting').textContent = '您好，歡迎使用預約系統！';
             } catch (error) {
                 console.error('LIFF initialization failed:', error);
-                // 如果是開發環境，可以不用 LIFF
-                console.log('Running in development mode without LIFF');
                 document.getElementById('userGreeting').textContent = '您好，歡迎使用預約系統！';
             }
         }
 
-        // 設定可選日期
-        function setupDatePicker() {
-            const dateInput = document.getElementById('date');
+        // 創建日期按鈕
+        function createDateButtons() {
+            const dateButtonsContainer = document.getElementById('dateButtons');
             const today = new Date();
-            const maxDate = new Date();
-            maxDate.setDate(today.getDate() + 7);
+            
+            // 清空容器
+            dateButtonsContainer.innerHTML = '';
+            
+            // 創建未來7天的日期按鈕
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                
+                const dayOfWeek = date.getDay();
+                const isToday = i === 0;
+                const isSunday = dayOfWeek === 0;
+                
+                // 創建按鈕
+                const button = document.createElement('div');
+                button.className = 'date-button';
+                
+                if (isSunday) {
+                    button.classList.add('disabled');
+                }
+                
+                // 格式化日期顯示
+                const month = date.getMonth() + 1;
+                const day = date.getDate();
+                const weekDay = weekDays[dayOfWeek];
+                
+                button.innerHTML = `
+                    <div class="date-main">${month}/${day}</div>
+                    <div class="date-day">(${weekDay})</div>
+                `;
+                
+                // 設置data屬性
+                button.setAttribute('data-date', date.toISOString().split('T')[0]);
+                
+                // 添加點擊事件
+                if (!isSunday) {
+                    button.addEventListener('click', () => selectDate(button));
+                }
+                
+                dateButtonsContainer.appendChild(button);
+            }
+        }
 
-            // 設定最小和最大日期
-            dateInput.min = today.toISOString().split('T')[0];
-            dateInput.max = maxDate.toISOString().split('T')[0];
-
-            // 監聽日期變化
-            dateInput.addEventListener('change', updateTimeSlots);
+        // 選擇日期
+        function selectDate(buttonElement) {
+            const dateValue = buttonElement.getAttribute('data-date');
+            
+            // 移除其他按鈕的選中狀態
+            document.querySelectorAll('.date-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // 添加選中狀態
+            buttonElement.classList.add('selected');
+            
+            // 更新隱藏的input值
+            document.getElementById('dateInput').value = dateValue;
+            selectedDate = dateValue;
+            
+            // 更新時段選項
+            updateTimeSlots();
         }
 
         // 更新時段選項
         function updateTimeSlots() {
-            const dateInput = document.getElementById('date');
             const timeSelect = document.getElementById('time');
             
-            if (!dateInput.value) {
+            if (!selectedDate) {
                 timeSelect.innerHTML = '<option value="">請先選擇日期</option>';
                 return;
             }
 
-            const selectedDate = new Date(dateInput.value);
-            const dayOfWeek = selectedDate.getDay();
-
-            // 檢查是否為週日
-            if (dayOfWeek === 0) {
-                alert('週日不提供服務，請選擇其他日期');
-                dateInput.value = '';
-                timeSelect.innerHTML = '<option value="">請先選擇日期</option>';
-                return;
-            }
+            const date = new Date(selectedDate);
+            const dayOfWeek = date.getDay();
 
             // 清空時段選項
             timeSelect.innerHTML = '<option value="">請選擇時段</option>';
@@ -201,11 +236,24 @@
             
             requiredFields.forEach(fieldName => {
                 const field = document.getElementById(fieldName);
-                const value = formData.get(fieldName);
+                let value;
+                
+                if (fieldName === 'date') {
+                    value = document.getElementById('dateInput').value;
+                } else {
+                    value = formData.get(fieldName);
+                }
                 
                 if (!value || value.trim() === '') {
-                    field.classList.add('error');
-                    showFieldError(field, '此欄位為必填');
+                    if (fieldName === 'date') {
+                        // 對日期按鈕顯示錯誤
+                        const dateButtonsContainer = document.getElementById('dateButtons');
+                        dateButtonsContainer.style.border = '2px solid #e74c3c';
+                        showFieldError(dateButtonsContainer, '請選擇預約日期');
+                    } else {
+                        field.classList.add('error');
+                        showFieldError(field, '此欄位為必填');
+                    }
                     isValid = false;
                 }
             });
@@ -252,27 +300,19 @@
                     name: formData.get('name'),
                     phone: formData.get('phone'),
                     plate: formData.get('plate'),
-                    date: formData.get('date'),
+                    date: document.getElementById('dateInput').value,
                     time: formData.get('time'),
                     serviceType: formData.get('serviceType'),
                     note: formData.get('note') || '',
                     timestamp: new Date().toISOString()
                 };
 
-                // 這裡需要替換為實際的 Google Apps Script URL
-                const response = await fetch('YOUR_GAS_WEBHOOK_URL', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(bookingData)
-                });
-
-                if (response.ok) {
-                    showSuccessMessage(bookingId);
-                } else {
-                    throw new Error('預約失敗');
-                }
+                // 模擬API請求
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                console.log('Booking data:', bookingData);
+                showSuccessMessage(bookingId);
+                
             } catch (error) {
                 console.error('Booking submission failed:', error);
                 alert('預約失敗，請稍後再試或直接聯絡店家');
@@ -291,16 +331,20 @@
         function closeSuccessMessage() {
             document.getElementById('successMessage').style.display = 'none';
             
-            // 如果在 LIFF 環境中，關閉視窗
-            if (typeof liff !== 'undefined' && liff.isInClient()) {
-                liff.closeWindow();
-            }
+            // 重置表單
+            document.getElementById('bookingForm').reset();
+            selectedDate = null;
+            document.querySelectorAll('.date-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.getElementById('dateInput').value = '';
+            updateTimeSlots();
         }
 
         // 頁面載入完成後初始化
         document.addEventListener('DOMContentLoaded', function() {
             initializeLiff();
-            setupDatePicker();
+            createDateButtons();
             
             // 綁定表單提交事件
             document.getElementById('bookingForm').addEventListener('submit', submitForm);

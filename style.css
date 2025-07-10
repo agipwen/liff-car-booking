@@ -99,6 +99,58 @@ body {
     margin-top: 5px;
 }
 
+/* 日期區塊按鈕樣式 */
+.date-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.date-button {
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 12px 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    user-select: none;
+}
+
+.date-button:hover {
+    background: #e9ecef;
+    border-color: #3498db;
+}
+
+.date-button.selected {
+    background: #3498db;
+    border-color: #3498db;
+    color: white;
+}
+
+.date-button.disabled {
+    background: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.date-button .date-main {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.date-button .date-day {
+    font-size: 0.85rem;
+    margin-top: 2px;
+}
+
+/* Hidden input for form submission */
+#dateInput {
+    display: none;
+}
+
 /* Button Styles */
 .submit-btn {
     width: 100%;
@@ -236,5 +288,9 @@ body {
 
     .success-message {
         padding: 30px 20px;
+    }
+
+    .date-buttons {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
