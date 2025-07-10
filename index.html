@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>統一汽車 - 線上預約</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 標題區域 -->
+        <header class="header">
+            <h1>統一汽車</h1>
+            <p>線上預約系統</p>
+            <div class="shop-info">
+                <p id="userGreeting">連接中...</p>
+            </div>
+        </header>
+
+        <!-- 預約表單 -->
+        <form id="bookingForm" class="booking-form">
+            <div class="form-group">
+                <label for="name">姓名 *</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">電話 *</label>
+                <input type="tel" id="phone" name="phone" required placeholder="請輸入您的聯絡電話">
+            </div>
+
+            <div class="form-group">
+                <label for="plate">車牌 *</label>
+                <input type="text" id="plate" name="plate" required placeholder="例：ABC-1234">
+            </div>
+
+            <div class="form-group">
+                <label for="date">預約日期 *</label>
+                <input type="date" id="date" name="date" required>
+                <small class="hint">可預約未來7天內，週日不開放</small>
+            </div>
+
+            <div class="form-group">
+                <label for="time">預約時段 *</label>
+                <select id="time" name="time" required>
+                    <option value="">請先選擇日期</option>
+                </select>
+                <small class="hint">週六僅開放上午時段</small>
+            </div>
+
+            <div class="form-group">
+                <label for="serviceType">服務項目 *</label>
+                <select id="serviceType" name="serviceType" required>
+                    <option value="">請選擇服務項目</option>
+                    <option value="保養">保養</option>
+                    <option value="維修">維修</option>
+                    <option value="其他">其他</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="note">備註</label>
+                <textarea id="note" name="note" placeholder="其他需要說明的事項（選填）"></textarea>
+            </div>
+
+            <button type="submit" class="submit-btn">確認預約</button>
+        </form>
+
+        <!-- 載入中遮罩 -->
+        <div id="loading" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>預約處理中...</p>
+        </div>
+
+        <!-- 成功訊息 -->
+        <div id="successMessage" class="success-message">
+            <div class="success-icon">✅</div>
+            <h2>預約成功！</h2>
+            <p>您的預約編號：<span id="bookingId"></span></p>
+            <p>我們將盡快為您確認預約時間</p>
+            <button id="closeBtn" class="close-btn">關閉</button>
+        </div>
+    </div>
+
+    <script>
+        // LIFF 相關變數
+        let liffProfile = null;
+        let liffUserId = null;
+
+        // 時段選項
+        const timeSlots = {
+            morning: ['8:00', '8:30', '9:00', '9:30', '10:00', '10:30', '11:00'],
+            afternoon: ['13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30']
+        };
+
+        // 初始化 LIFF
+        async function initializeLiff() {
+            try {
+                await liff.init({ liffId: '2007724265-YJ80zrNX' }); // 請替換為實際的 LIFF ID
+                
+                if (liff.isLoggedIn()) {
+                    liffProfile = await liff.getProfile();
+                    liffUserId = liffProfile.userId;
+                    
+                    // 自動填入姓名
+                    document.getElementById('name').value = liffProfile.displayName || '';
+                    
+                    // 顯示用戶問候語
+                    document.getElementById('userGreeting').textContent = `您好，${liffProfile.displayName || '訪客'}！`;
+                } else {
+                    liff.login();
+                }
+            } catch (error) {
+                console.error('LIFF initialization failed:', error);
+                // 如果是開發環境，可以不用 LIFF
+                console.log('Running in development mode without LIFF');
+                document.getElementById('userGreeting').textContent = '您好，歡迎使用預約系統！';
+            }
+        }
+
+        // 設定可選日期
+        function setupDatePicker() {
+            const dateInput = document.getElementById('date');
+            const today = new Date();
+            const maxDate = new Date();
+            maxDate.setDate(today.getDate() + 7);
+
+            // 設定最小和最大日期
+            dateInput.min = today.toISOString().split('T')[0];
+            dateInput.max = maxDate.toISOString().split('T')[0];
+
+            // 監聽日期變化
+            dateInput.addEventListener('change', updateTimeSlots);
+        }
+
+        // 更新時段選項
+        function updateTimeSlots() {
+            const dateInput = document.getElementById('date');
+            const timeSelect = document.getElementById('time');
+            
+            if (!dateInput.value) {
+                timeSelect.innerHTML = '<option value="">請先選擇日期</option>';
+                return;
+            }
+
+            const selectedDate = new Date(dateInput.value);
+            const dayOfWeek = selectedDate.getDay();
+
+            // 檢查是否為週日
+            if (dayOfWeek === 0) {
+                alert('週日不提供服務，請選擇其他日期');
+                dateInput.value = '';
+                timeSelect.innerHTML = '<option value="">請先選擇日期</option>';
+                return;
+            }
+
+            // 清空時段選項
+            timeSelect.innerHTML = '<option value="">請選擇時段</option>';
+
+            // 上午時段（所有營業日都有）
+            timeSlots.morning.forEach(time => {
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = time;
+                timeSelect.appendChild(option);
+            });
+
+            // 下午時段（僅平日，週六不開放）
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                timeSlots.afternoon.forEach(time => {
+                    const option = document.createElement('option');
+                    option.value = time;
+                    option.textContent = time;
+                    timeSelect.appendChild(option);
+                });
+            }
+        }
+
+        // 生成預約編號
+        function generateBookingId() {
+            const today = new Date();
+            const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+            const randomStr = Math.random().toString(36).substr(2, 5).toUpperCase();
+            return `A${dateStr}-${randomStr}`;
+        }
+
+        // 表單驗證
+        function validateForm() {
+            const form = document.getElementById('bookingForm');
+            const formData = new FormData(form);
+            let isValid = true;
+
+            // 清除之前的錯誤狀態
+            document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+            // 檢查必填欄位
+            const requiredFields = ['name', 'phone', 'plate', 'date', 'time', 'serviceType'];
+            
+            requiredFields.forEach(fieldName => {
+                const field = document.getElementById(fieldName);
+                const value = formData.get(fieldName);
+                
+                if (!value || value.trim() === '') {
+                    field.classList.add('error');
+                    showFieldError(field, '此欄位為必填');
+                    isValid = false;
+                }
+            });
+
+            // 電話號碼格式驗證
+            const phone = formData.get('phone');
+            if (phone && !/^[0-9-+\s()]{8,15}$/.test(phone)) {
+                const phoneField = document.getElementById('phone');
+                phoneField.classList.add('error');
+                showFieldError(phoneField, '請輸入有效的電話號碼');
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        // 顯示欄位錯誤訊息
+        function showFieldError(field, message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            field.parentNode.insertBefore(errorDiv, field.nextSibling);
+        }
+
+        // 提交表單
+        async function submitForm(event) {
+            event.preventDefault();
+            
+            if (!validateForm()) {
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            loading.style.display = 'flex';
+
+            try {
+                const formData = new FormData(document.getElementById('bookingForm'));
+                const bookingId = generateBookingId();
+                
+                // 準備送出的資料
+                const bookingData = {
+                    userId: liffUserId || 'test-user',
+                    bookingId: bookingId,
+                    name: formData.get('name'),
+                    phone: formData.get('phone'),
+                    plate: formData.get('plate'),
+                    date: formData.get('date'),
+                    time: formData.get('time'),
+                    serviceType: formData.get('serviceType'),
+                    note: formData.get('note') || '',
+                    timestamp: new Date().toISOString()
+                };
+
+                // 這裡需要替換為實際的 Google Apps Script URL
+                const response = await fetch('YOUR_GAS_WEBHOOK_URL', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(bookingData)
+                });
+
+                if (response.ok) {
+                    showSuccessMessage(bookingId);
+                } else {
+                    throw new Error('預約失敗');
+                }
+            } catch (error) {
+                console.error('Booking submission failed:', error);
+                alert('預約失敗，請稍後再試或直接聯絡店家');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 顯示成功訊息
+        function showSuccessMessage(bookingId) {
+            document.getElementById('bookingId').textContent = bookingId;
+            document.getElementById('successMessage').style.display = 'block';
+        }
+
+        // 關閉成功訊息
+        function closeSuccessMessage() {
+            document.getElementById('successMessage').style.display = 'none';
+            
+            // 如果在 LIFF 環境中，關閉視窗
+            if (typeof liff !== 'undefined' && liff.isInClient()) {
+                liff.closeWindow();
+            }
+        }
+
+        // 頁面載入完成後初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeLiff();
+            setupDatePicker();
+            
+            // 綁定表單提交事件
+            document.getElementById('bookingForm').addEventListener('submit', submitForm);
+            
+            // 綁定關閉按鈕事件
+            document.getElementById('closeBtn').addEventListener('click', closeSuccessMessage);
+        });
+    </script>
+</body>
+</html>
