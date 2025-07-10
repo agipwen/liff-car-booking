@@ -41,10 +41,11 @@ body {
 }
 
 .shop-info {
-    background: #ecf0f1;
-    padding: 10px;
+    background: #f8f9fa;
+    padding: 15px;
     border-radius: 8px;
-    margin-top: 15px;
+    margin-bottom: 20px;
+    border-left: 4px solid #3498db;
 }
 
 .shop-info p {
