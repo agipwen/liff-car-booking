@@ -111,13 +111,15 @@
                     liffProfile = profile;
                     liffUserId = profile.userId;
                     document.getElementById('userGreeting').textContent = `您好，${profile.displayName}`;
+                    // 自動填入姓名欄位
+                    document.getElementById('name').value = profile.displayName;
                 } else {
                     liff.login();
                 }
 
             } catch (error) {
                 console.error('LIFF 初始化失敗:', error);
-                document.getElementById('userGreeting').textContent = 'LIFF 初始化失敗';
+                document.getElementById('userGreeting').textContent = '請使用 LINE 開啟此預約頁面';
             }
         }
 
