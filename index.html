@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>統一汽車 - 線上預約</title>
-    <link rel="stylesheet" href="style.css">
     <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
@@ -18,6 +18,15 @@
                 <p id="userGreeting">連接中...</p>
             </div>
         </header>
+
+        <!-- 除錯資訊 -->
+        <div class="debug-info">
+            <h3>🔍 除錯資訊</h3>
+            <div>LIFF 狀態: <span id="liffStatus">檢查中...</span></div>
+            <div>用戶ID: <span id="userIdDebug">未取得</span></div>
+            <div>API URL: <span id="apiUrlDebug">未設定</span></div>
+            <div>最後錯誤: <span id="lastError">無</span></div>
+        </div>
 
         <!-- 預約表單 -->
         <form id="bookingForm" class="booking-form">
@@ -77,15 +86,17 @@
 
         <!-- 成功訊息 -->
         <div id="successMessage" class="success-message">
-            <div class="success-icon"><i class="fa-solid fa-circle-check" style="color:#27ae60;"></i></div>
-            <h2>預約成功！</h2>
-            <p>您的預約編號：<span id="bookingId"></span></p>
-            <button id="closeBtn" class="close-btn">關閉</button>
+            <div>
+                <div class="success-icon"><i class="fa-solid fa-circle-check" style="color:#27ae60;"></i></div>
+                <h2>預約成功！</h2>
+                <p>您的預約編號：<span id="bookingId"></span></p>
+                <button id="closeBtn" class="close-btn">關閉</button>
+            </div>
         </div>
     </div>
 
     <script>
-       // ⚠️ 請在這裡填入您的 Google Apps Script Web App URL
+        // ⚠️ 請確認這個 URL 是否正確且已部署
         const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzAhNvgzW5ZqPteINKHd69LpE3rK2L28htSfENqKncvgOh3UKh5DOEkaUEpp8Pj86BF/exec';
 
         // LIFF 相關變數
@@ -102,27 +113,59 @@
         // 星期對應
         const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
+        // 更新除錯資訊
+        function updateDebugInfo(key, value) {
+            const element = document.getElementById(key);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        // 記錄錯誤
+        function logError(error) {
+            console.error('錯誤:', error);
+            updateDebugInfo('lastError', error.message || error);
+        }
+
         // 初始化 LIFF
         async function initializeLiff() {
             try {
+                updateDebugInfo('liffStatus', '初始化中...');
+                
+                // 先檢查是否在 LINE 環境中
+                if (typeof liff === 'undefined') {
+                    throw new Error('LIFF SDK 未載入');
+                }
+
                 await liff.init({
-                    liffId: '2007724265-YJ80zrNX'  // ← 在這裡放上你自己的 LIFF ID
+                    liffId: '2007724265-YJ80zrNX'  // ← 確認這個 LIFF ID 是否正確
                 });
+
+                updateDebugInfo('liffStatus', '已連接');
 
                 if (liff.isLoggedIn()) {
                     const profile = await liff.getProfile();
                     liffProfile = profile;
                     liffUserId = profile.userId;
+                    
+                    updateDebugInfo('userIdDebug', liffUserId);
                     document.getElementById('userGreeting').textContent = `您好，${profile.displayName}`;
-                    // 自動填入姓名欄位
                     document.getElementById('name').value = profile.displayName;
+                    
+                    updateDebugInfo('liffStatus', '已登入');
                 } else {
+                    updateDebugInfo('liffStatus', '未登入，嘗試登入...');
                     liff.login();
                 }
 
             } catch (error) {
-                console.error('LIFF 初始化失敗:', error);
+                logError(error);
+                updateDebugInfo('liffStatus', '失敗: ' + error.message);
                 document.getElementById('userGreeting').textContent = '請使用 LINE 開啟此預約頁面';
+                
+                // 如果 LIFF 失敗，使用測試用戶
+                liffUserId = 'test-user-' + Date.now();
+                updateDebugInfo('userIdDebug', liffUserId + ' (測試模式)');
             }
         }
 
@@ -131,19 +174,15 @@
             const dateButtonsContainer = document.getElementById('dateButtons');
             const today = new Date();
             
-            // 清空容器
             dateButtonsContainer.innerHTML = '';
             
-            // 創建未來7天的日期按鈕
             for (let i = 0; i < 7; i++) {
                 const date = new Date(today);
                 date.setDate(today.getDate() + i);
                 
                 const dayOfWeek = date.getDay();
-                const isToday = i === 0;
                 const isSunday = dayOfWeek === 0;
                 
-                // 創建按鈕
                 const button = document.createElement('div');
                 button.className = 'date-button';
                 
@@ -151,7 +190,6 @@
                     button.classList.add('disabled');
                 }
                 
-                // 格式化日期顯示
                 const month = date.getMonth() + 1;
                 const day = date.getDate();
                 const weekDay = weekDays[dayOfWeek];
@@ -161,10 +199,8 @@
                     <div class="date-day">(${weekDay})</div>
                 `;
                 
-                // 設置data屬性
                 button.setAttribute('data-date', date.toISOString().split('T')[0]);
                 
-                // 添加點擊事件
                 if (!isSunday) {
                     button.addEventListener('click', () => selectDate(button));
                 }
@@ -177,19 +213,14 @@
         function selectDate(buttonElement) {
             const dateValue = buttonElement.getAttribute('data-date');
             
-            // 移除其他按鈕的選中狀態
             document.querySelectorAll('.date-button').forEach(btn => {
                 btn.classList.remove('selected');
             });
             
-            // 添加選中狀態
             buttonElement.classList.add('selected');
-            
-            // 更新隱藏的input值
             document.getElementById('dateInput').value = dateValue;
             selectedDate = dateValue;
             
-            // 更新時段選項
             updateTimeSlots();
         }
 
@@ -205,10 +236,8 @@
             const date = new Date(selectedDate);
             const dayOfWeek = date.getDay();
 
-            // 清空時段選項
             timeSelect.innerHTML = '<option value="">請選擇時段</option>';
 
-            // 上午時段（所有營業日都有）
             timeSlots.morning.forEach(time => {
                 const option = document.createElement('option');
                 option.value = time;
@@ -216,7 +245,6 @@
                 timeSelect.appendChild(option);
             });
 
-            // 下午時段（僅平日，週六不開放）
             if (dayOfWeek >= 1 && dayOfWeek <= 5) {
                 timeSlots.afternoon.forEach(time => {
                     const option = document.createElement('option');
@@ -241,11 +269,9 @@
             const formData = new FormData(form);
             let isValid = true;
 
-            // 清除之前的錯誤狀態
             document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
             document.querySelectorAll('.error-message').forEach(el => el.remove());
 
-            // 檢查必填欄位
             const requiredFields = ['name', 'phone', 'plate', 'date', 'time', 'serviceType'];
             
             requiredFields.forEach(fieldName => {
@@ -260,7 +286,6 @@
                 
                 if (!value || value.trim() === '') {
                     if (fieldName === 'date') {
-                        // 對日期按鈕顯示錯誤
                         const dateButtonsContainer = document.getElementById('dateButtons');
                         dateButtonsContainer.style.border = '2px solid #e74c3c';
                         showFieldError(dateButtonsContainer, '請選擇預約日期');
@@ -272,7 +297,6 @@
                 }
             });
 
-            // 電話號碼格式驗證
             const phone = formData.get('phone');
             if (phone && !/^[0-9-+\s()]{8,15}$/.test(phone)) {
                 const phoneField = document.getElementById('phone');
@@ -292,13 +316,17 @@
             field.parentNode.insertBefore(errorDiv, field.nextSibling);
         }
 
-        // 🔌 連接到 Google Apps Script
+        // 連接到 Google Apps Script (增強版)
         async function callGAS(action, data) {
             try {
+                updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL);
+                
                 const payload = {
                     action: action,
                     ...data
                 };
+
+                console.log('發送到 GAS:', payload);
 
                 const response = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
@@ -309,15 +337,22 @@
                     mode: 'cors'
                 });
 
+                console.log('HTTP 狀態:', response.status);
+                console.log('Response Headers:', [...response.headers.entries()]);
+
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('HTTP 錯誤回應:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const result = await response.json();
+                console.log('GAS 回應:', result);
                 return result;
 
             } catch (error) {
                 console.error('GAS API 調用失敗:', error);
+                logError(error);
                 throw error;
             }
         }
@@ -331,15 +366,18 @@
             }
 
             const loading = document.getElementById('loading');
+            const submitBtn = document.querySelector('.submit-btn');
+            
             loading.style.display = 'flex';
+            submitBtn.disabled = true;
+            submitBtn.textContent = '處理中...';
 
             try {
                 const formData = new FormData(document.getElementById('bookingForm'));
                 const bookingId = generateBookingId();
                 
-                // 準備送出的資料
                 const bookingData = {
-                    userId: liffUserId || 'test-user',
+                    userId: liffUserId || 'fallback-user',
                     bookingId: bookingId,
                     name: formData.get('name'),
                     phone: formData.get('phone'),
@@ -353,7 +391,6 @@
 
                 console.log('發送預約資料:', bookingData);
 
-                // 🚀 實際調用 GAS API
                 const result = await callGAS('createBooking', bookingData);
                 
                 console.log('GAS 回應:', result);
@@ -366,9 +403,24 @@
                 
             } catch (error) {
                 console.error('預約提交失敗:', error);
-                alert('預約失敗：' + error.message + '\n\n請稍後再試或直接聯絡店家');
+                logError(error);
+                
+                let errorMessage = '預約失敗，請稍後再試';
+                
+                if (error.message.includes('HTTP')) {
+                    errorMessage += '\n\n伺服器連接問題，請檢查網路連線';
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage += '\n\n網路連接失敗，請檢查網路設定';
+                } else {
+                    errorMessage += '\n\n錯誤詳情：' + error.message;
+                }
+                
+                alert(errorMessage);
+                
             } finally {
                 loading.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.textContent = '確認預約';
             }
         }
 
@@ -382,7 +434,6 @@
         function closeSuccessMessage() {
             document.getElementById('successMessage').style.display = 'none';
             
-            // 重置表單
             document.getElementById('bookingForm').reset();
             selectedDate = null;
             document.querySelectorAll('.date-button').forEach(btn => {
@@ -391,7 +442,6 @@
             document.getElementById('dateInput').value = '';
             updateTimeSlots();
             
-            // 如果是 LIFF 環境，關閉視窗
             if (liff && liff.isInClient()) {
                 liff.closeWindow();
             }
@@ -399,14 +449,15 @@
 
         // 頁面載入完成後初始化
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('頁面載入完成，開始初始化...');
+            
             initializeLiff();
             createDateButtons();
             
-            // 綁定表單提交事件
             document.getElementById('bookingForm').addEventListener('submit', submitForm);
-            
-            // 綁定關閉按鈕事件
             document.getElementById('closeBtn').addEventListener('click', closeSuccessMessage);
+            
+            console.log('初始化完成');
         });
     </script>
 </body>

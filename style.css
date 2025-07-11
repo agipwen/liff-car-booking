@@ -295,3 +295,26 @@ body {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+
+.debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .debug-info h3 {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+
+        .debug-info pre {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
