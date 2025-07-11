@@ -62,7 +62,7 @@
             </div>
 
             <div class="form-group">
-                <label for="note">備註</label>
+                <label for="note">備註（*初次來訪請填寫車型）</label>
                 <textarea id="note" name="note" placeholder="其他需要說明的事項（選填）"></textarea>
             </div>
 
@@ -85,6 +85,9 @@
     </div>
 
     <script>
+       // ⚠️ 請在這裡填入您的 Google Apps Script Web App URL
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzAhNvgzW5ZqPteINKHd69LpE3rK2L28htSfENqKncvgOh3UKh5DOEkaUEpp8Pj86BF/exec';
+
         // LIFF 相關變數
         let liffProfile = null;
         let liffUserId = null;
@@ -289,6 +292,36 @@
             field.parentNode.insertBefore(errorDiv, field.nextSibling);
         }
 
+        // 🔌 連接到 Google Apps Script
+        async function callGAS(action, data) {
+            try {
+                const payload = {
+                    action: action,
+                    ...data
+                };
+
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                    mode: 'cors'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                return result;
+
+            } catch (error) {
+                console.error('GAS API 調用失敗:', error);
+                throw error;
+            }
+        }
+
         // 提交表單
         async function submitForm(event) {
             event.preventDefault();
@@ -318,15 +351,22 @@
                     timestamp: new Date().toISOString()
                 };
 
-                // 模擬API請求
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                console.log('發送預約資料:', bookingData);
+
+                // 🚀 實際調用 GAS API
+                const result = await callGAS('createBooking', bookingData);
                 
-                console.log('Booking data:', bookingData);
-                showSuccessMessage(bookingId);
+                console.log('GAS 回應:', result);
+
+                if (result.success) {
+                    showSuccessMessage(bookingId);
+                } else {
+                    throw new Error(result.message || '預約失敗');
+                }
                 
             } catch (error) {
-                console.error('Booking submission failed:', error);
-                alert('預約失敗，請稍後再試或直接聯絡店家');
+                console.error('預約提交失敗:', error);
+                alert('預約失敗：' + error.message + '\n\n請稍後再試或直接聯絡店家');
             } finally {
                 loading.style.display = 'none';
             }
@@ -350,6 +390,11 @@
             });
             document.getElementById('dateInput').value = '';
             updateTimeSlots();
+            
+            // 如果是 LIFF 環境，關閉視窗
+            if (liff && liff.isInClient()) {
+                liff.closeWindow();
+            }
         }
 
         // 頁面載入完成後初始化
