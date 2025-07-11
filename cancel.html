@@ -16,23 +16,6 @@
         </header>
 
         <div class="content">
-            <!-- 模擬測試按鈕 -->
-            <div class="debug-info" style="background: #e7f3ff; border-color: #007bff;">
-                <h3>🚀 模擬測試</h3>
-                <p>這是模擬版本，您可以測試不同的情況：</p>
-                <div style="margin-top: 10px;">
-                    <button onclick="testNormalBooking()" class="btn btn-primary" style="margin: 5px; padding: 8px 15px; font-size: 0.9em;">
-                        測試正常預約
-                    </button>
-                    <button onclick="testCancelledBooking()" class="btn btn-secondary" style="margin: 5px; padding: 8px 15px; font-size: 0.9em;">
-                        測試已取消預約
-                    </button>
-                    <button onclick="testInvalidBooking()" class="btn btn-danger" style="margin: 5px; padding: 8px 15px; font-size: 0.9em;">
-                        測試無效預約
-                    </button>
-                </div>
-            </div>
-
             <!-- 除錯資訊 -->
             <div class="debug-info">
                 <h3>🔍 除錯檢查</h3>
@@ -130,107 +113,85 @@
     </div>
 
     <script>
-        // 請使用與預約頁面相同的 GAS URL
+        // 你需要修改這個 URL 為你的 GAS Web App URL
         const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzAhNvgzW5ZqPteINKHd69LpE3rK2L28htSfENqKncvgOh3UKh5DOEkaUEpp8Pj86BF/exec';
-
-        // 全域變數
         let bookingId = null;
         let userId = null;
         let bookingData = null;
-        let liffProfile = null;
 
-        // 更新除錯資訊
         function updateDebugInfo(key, value) {
             const element = document.getElementById(key);
-            if (element) {
-                element.textContent = value;
-            }
+            if (element) element.textContent = value;
         }
 
-        // 記錄錯誤
         function logError(error) {
             console.error('錯誤:', error);
             updateDebugInfo('lastError', error.message || error);
         }
 
-        // 從 URL 取得參數 (模擬版本)
         function getUrlParameters() {
             const urlParams = new URLSearchParams(window.location.search);
             bookingId = urlParams.get('bookingId');
             userId = urlParams.get('userId');
 
-            // 如果沒有參數，使用模擬資料
-            if (!bookingId) {
-                bookingId = 'A20241211-TEST1';
-                console.log('使用模擬預約編號:', bookingId);
-            }
-            if (!userId) {
-                userId = 'U123456789test';
-                console.log('使用模擬用戶ID:', userId);
-            }
+            updateDebugInfo('bookingIdParam', bookingId || '未提供');
+            updateDebugInfo('userIdParam', userId || '未提供');
 
-            updateDebugInfo('bookingIdParam', bookingId + ' (模擬)');
-            updateDebugInfo('userIdParam', userId + ' (模擬)');
+            if (!bookingId || !userId) {
+                showError('缺少必要的 bookingId 或 userId 參數');
+                document.getElementById('loading').style.display = 'none';
+                return false;
+            }
 
             return true;
         }
 
-        // 初始化 LIFF
         async function initializeLiff() {
             try {
                 updateDebugInfo('liffStatus', '初始化中...');
-
-                if (typeof liff === 'undefined') {
-                    updateDebugInfo('liffStatus', 'LIFF SDK 未載入');
+                // 模擬 LIFF 初始化（在本地測試時）
+                if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+                    updateDebugInfo('liffStatus', '本地測試模式');
                     return;
                 }
-
-                await liff.init({
-                    liffId: '2007724265-YJ80zrNX'
-                });
-
-                updateDebugInfo('liffStatus', '已連接');
-
-                if (liff.isLoggedIn()) {
-                    const profile = await liff.getProfile();
-                    liffProfile = profile;
-                    updateDebugInfo('liffStatus', '已登入');
+                
+                // 實際的 LIFF 初始化
+                if (typeof liff !== 'undefined') {
+                    await liff.init({ liffId: '2007724265-YJ80zrNX' });
+                    if (liff.isLoggedIn()) {
+                        updateDebugInfo('liffStatus', '已登入');
+                    } else {
+                        updateDebugInfo('liffStatus', '未登入');
+                    }
                 } else {
-                    updateDebugInfo('liffStatus', '未登入');
+                    updateDebugInfo('liffStatus', 'LIFF SDK 未載入');
                 }
-
             } catch (error) {
                 logError(error);
                 updateDebugInfo('liffStatus', '失敗: ' + error.message);
             }
         }
 
-        // 調用 Google Apps Script (模擬版本)
         async function callGAS(action, data) {
             try {
-                updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL + ' (模擬模式)');
+                const payload = { action, ...data };
+                console.log('發送到 GAS 的資料:', payload);
 
-                const payload = {
-                    action: action,
-                    ...data
-                };
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
 
-                console.log('發送到 GAS (模擬):', payload);
-
-                // 模擬網路延遲
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-                // 模擬不同的回應
-                let result;
-                if (action === 'getBooking') {
-                    result = mockGetBooking(data);
-                } else if (action === 'cancelBooking') {
-                    result = mockCancelBooking(data);
-                } else {
-                    result = { success: false, message: '未知的操作' };
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
-                console.log('GAS 回應 (模擬):', result);
+                const result = await response.json();
+                updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL);
+                console.log('GAS 回應:', result);
                 return result;
 
             } catch (error) {
@@ -240,72 +201,15 @@
             }
         }
 
-        // 模擬查詢預約資料
-        function mockGetBooking(data) {
-            const { bookingId, userId } = data;
-            
-            // 模擬不同的情況
-            if (!bookingId || bookingId === 'invalid') {
-                return {
-                    success: false,
-                    message: '找不到預約資料，請檢查預約編號'
-                };
-            }
-
-            if (bookingId === 'cancelled') {
-                return {
-                    success: true,
-                    data: {
-                        bookingId: 'A20241211-XYZ99',
-                        name: '王小明',
-                        phone: '0912-345-678',
-                        plate: 'ABC-1234',
-                        date: '2024-12-15',
-                        time: '10:00',
-                        serviceType: '保養',
-                        note: '第一次來訪，Toyota Camry 2020年',
-                        timestamp: '2024-12-11T10:30:00.000Z',
-                        status: 'cancelled'
-                    }
-                };
-            }
-
-            // 預設返回正常預約資料
-            return {
-                success: true,
-                data: {
-                    bookingId: bookingId,
-                    name: '張大華',
-                    phone: '0987-654-321',
-                    plate: 'DEF-5678',
-                    date: '2024-12-20',
-                    time: '14:30',
-                    serviceType: '維修',
-                    note: '煞車異音需要檢查',
-                    timestamp: '2024-12-11T09:15:00.000Z',
-                    status: 'active'
-                }
-            };
-        }
-
-        // 模擬取消預約
-        function mockCancelBooking(data) {
-            const { bookingId, userId } = data;
-            
-            // 模擬取消成功
-            return {
-                success: true,
-                message: '預約已成功取消'
-            };
-        }
-
-        // 查詢預約資料
         async function fetchBookingData() {
             try {
+                console.log('開始查詢預約資料...');
                 const result = await callGAS('getBooking', {
                     bookingId: bookingId,
                     userId: userId
                 });
+
+                console.log('查詢結果:', result);
 
                 if (result.success) {
                     bookingData = result.data;
@@ -322,8 +226,9 @@
             }
         }
 
-        // 顯示預約資料
         function displayBookingData() {
+            console.log('顯示預約資料:', bookingData);
+            
             document.getElementById('displayBookingId').textContent = bookingData.bookingId;
             document.getElementById('customerName').textContent = bookingData.name;
             document.getElementById('customerPhone').textContent = bookingData.phone;
@@ -332,13 +237,19 @@
             document.getElementById('appointmentTime').textContent = bookingData.time;
             document.getElementById('serviceType').textContent = bookingData.serviceType;
             document.getElementById('appointmentNote').textContent = bookingData.note || '無';
-            document.getElementById('createdTime').textContent = formatDateTime(bookingData.timestamp);
+            
+            // 處理建立時間 - 支援多種格式
+            const createdTime = bookingData.timestamp || bookingData.createdAt || bookingData.createdTime;
+            if (createdTime) {
+                document.getElementById('createdTime').textContent = formatDateTime(createdTime);
+            } else {
+                document.getElementById('createdTime').textContent = '無資料';
+            }
 
-            // 設定狀態
             const statusElement = document.getElementById('bookingStatus');
             const cancelBtn = document.getElementById('cancelBtn');
 
-            if (bookingData.status === 'cancelled') {
+            if (bookingData.status === 'cancelled' || bookingData.status === '已取消') {
                 statusElement.textContent = '已取消';
                 statusElement.className = 'booking-status status-cancelled';
                 cancelBtn.style.display = 'none';
@@ -351,42 +262,41 @@
             document.getElementById('bookingDetails').style.display = 'block';
         }
 
-        // 格式化日期
         function formatDate(dateString) {
-            const date = new Date(dateString);
-            const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-            const year = date.getFullYear();
-            const month = date.getMonth() + 1;
-            const day = date.getDate();
-            const weekDay = weekDays[date.getDay()];
-
-            return `${year}/${month}/${day} (${weekDay})`;
+            try {
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) {
+                    return dateString; // 如果無法解析，直接返回原字串
+                }
+                const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+                return `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} (${weekDays[date.getDay()]})`;
+            } catch (error) {
+                console.error('日期格式化錯誤:', error);
+                return dateString;
+            }
         }
 
-        // 格式化日期時間
         function formatDateTime(timestamp) {
-            const date = new Date(timestamp);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-
-            return `${year}/${month}/${day} ${hours}:${minutes}`;
+            try {
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) {
+                    return timestamp; // 如果無法解析，直接返回原字串
+                }
+                return `${date.getFullYear()}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getDate().toString().padStart(2,'0')} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+            } catch (error) {
+                console.error('時間格式化錯誤:', error);
+                return timestamp;
+            }
         }
 
-        // 顯示錯誤訊息
         function showError(message) {
             document.getElementById('errorText').textContent = message;
             document.getElementById('errorMessage').style.display = 'block';
             document.getElementById('loading').style.display = 'none';
         }
 
-        // 取消預約
         async function cancelBooking() {
             const cancelBtn = document.getElementById('confirmCancelBtn');
-            const originalText = cancelBtn.textContent;
-            
             cancelBtn.disabled = true;
             cancelBtn.textContent = '處理中...';
 
@@ -409,85 +319,47 @@
                 alert('取消失敗：' + error.message);
             } finally {
                 cancelBtn.disabled = false;
-                cancelBtn.textContent = originalText;
+                cancelBtn.textContent = '確認取消';
             }
         }
 
-        // 事件監聽器
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('頁面載入完成');
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('頁面載入完成，開始初始化...');
+            
+            if (!getUrlParameters()) return;
+            
+            initializeLiff().then(() => {
+                console.log('LIFF 初始化完成，開始查詢預約資料...');
+                fetchBookingData();
+            }).catch(error => {
+                console.error('LIFF 初始化失敗:', error);
+                // 即使 LIFF 初始化失敗，仍然嘗試查詢預約資料
+                fetchBookingData();
+            });
 
-            // 取得 URL 參數
-            if (!getUrlParameters()) {
-                return;
-            }
-
-            // 初始化 LIFF
-            initializeLiff();
-
-            // 查詢預約資料
-            fetchBookingData();
-
-            // 取消預約按鈕
-            document.getElementById('cancelBtn').addEventListener('click', function() {
+            // 事件監聽器
+            document.getElementById('cancelBtn').addEventListener('click', () => {
                 document.getElementById('cancelModal').style.display = 'block';
             });
 
-            // 確認取消按鈕
             document.getElementById('confirmCancelBtn').addEventListener('click', cancelBooking);
-
-            // 取消取消按鈕
-            document.getElementById('cancelCancelBtn').addEventListener('click', function() {
+            
+            document.getElementById('cancelCancelBtn').addEventListener('click', () => {
                 document.getElementById('cancelModal').style.display = 'none';
             });
 
-            // 關閉按鈕
-            document.getElementById('closeBtn').addEventListener('click', function() {
-                if (liff && liff.isInClient()) {
+            document.getElementById('closeBtn').addEventListener('click', () => {
+                if (typeof liff !== 'undefined' && liff.isInClient()) {
                     liff.closeWindow();
                 } else {
                     window.history.back();
                 }
             });
 
-            // 點擊模態框外部關閉
             document.getElementById('cancelModal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    this.style.display = 'none';
-                }
+                if (e.target === this) this.style.display = 'none';
             });
         });
-
-        // 模擬測試函數
-        function testNormalBooking() {
-            bookingId = 'A20241211-TEST1';
-            userId = 'U123456789test';
-            resetPage();
-            fetchBookingData();
-        }
-
-        function testCancelledBooking() {
-            bookingId = 'cancelled';
-            userId = 'U123456789test';
-            resetPage();
-            fetchBookingData();
-        }
-
-        function testInvalidBooking() {
-            bookingId = 'invalid';
-            userId = 'U123456789test';
-            resetPage();
-            fetchBookingData();
-        }
-
-        function resetPage() {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('errorMessage').style.display = 'none';
-            document.getElementById('successMessage').style.display = 'none';
-            document.getElementById('bookingDetails').style.display = 'none';
-            updateDebugInfo('bookingIdParam', bookingId + ' (模擬)');
-            updateDebugInfo('userIdParam', userId + ' (模擬)');
-        }
     </script>
 </body>
 </html>
