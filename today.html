@@ -3,225 +3,645 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>今日預約清單</title>
+    <title>後台預約查看</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #649dee;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        .date-selector {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .date-selector select {
+            padding: 8px 15px;
+            border: 2px solid white;
+            border-radius: 6px;
+            background: white;
+            color: #649dee;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .date-selector select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+        }
+
+        .current-date {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: white;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 15px;
+            border-radius: 6px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 30px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .stat-item {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            min-width: 140px;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border-color: #649dee;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #649dee;
+            margin-bottom: 10px;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 1em;
+            color: #495057;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+
+        .timeline-container {
+            background: white;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .timeline-header {
+            background: #649dee;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .weekday-info {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .timeline-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0;
+            padding: 20px;
+        }
+
+        .time-slot {
+            display: contents;
+        }
+
+        .time-label {
+            background: #649dee;
+            color: white;
+            padding: 15px 20px;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 6px;
+            margin: 5px 10px 5px 0;
+            min-width: 80px;
+            align-self: start;
+        }
+
+        .time-slot.unavailable .time-label {
+            background: #dee2e6;
+            color: #6c757d;
+        }
+
+        .slot-content {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 5px 0;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .slot-content.available {
+            border-color: #dee2e6;
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+
+        .slot-content.available:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .slot-content.booked {
+            border-color: #649dee;
+            background: #f0f4ff;
+            border-style: solid;
+        }
+
+        .slot-content.unavailable {
+            background: #f8f9fa;
+            border-color: #dee2e6;
+            opacity: 0.6;
+        }
+
+        .appointment-info {
+            margin-bottom: 10px;
+        }
+
+        .appointment-info:last-child {
+            margin-bottom: 0;
+        }
+
+        .customer-name {
+            font-weight: bold;
+            color: #495057;
+            font-size: 1em;
+            margin-bottom: 3px;
+        }
+
+        .car-plate {
+            color: #649dee;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-bottom: 3px;
+        }
+
+        .service-type {
+            color: #6c757d;
+            font-size: 0.85em;
+            font-style: italic;
+        }
+
+        .service-type.maintenance {
+            color: #28a745;
+        }
+
+        .service-type.repair {
+            color: #dc3545;
+        }
+
+        .service-type.other {
+            color: #ffc107;
+        }
+
+        .available-text {
+            color: #6c757d;
+            font-weight: normal;
+            text-align: center;
+            font-size: 1em;
+        }
+
+        .unavailable-text {
+            color: #6c757d;
+            text-align: center;
+            font-size: 0.9em;
+            font-style: italic;
+        }
+
+        .capacity-info {
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid;
+        }
+
+        .legend-color.available {
+            background: #f8f9fa;
+            border-color: #dee2e6;
+        }
+
+        .legend-color.booked {
+            background: #f0f4ff;
+            border-color: #649dee;
+        }
+
+        .legend-color.unavailable {
+            background: #f8f9fa;
+            border-color: #dee2e6;
+        }
+
+        @media (max-width: 768px) {
+            .timeline-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .time-slot {
+                display: block;
+                margin-bottom: 15px;
+            }
+            
+            .time-label {
+                margin: 0 0 10px 0;
+                display: inline-block;
+            }
+            
+            .slot-content {
+                margin: 0;
+            }
+            
+            .stats {
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+            
+            .stat-item {
+                min-width: 120px;
+                min-height: 120px;
+                padding: 20px;
+                flex: 1;
+                max-width: calc(50% - 15px);
+            }
+            
+            .stat-number {
+                font-size: 2em;
+            }
+        }
+    </style>
     <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="today.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1><i class="fas fa-calendar-day"></i> 今日預約清單</h1>
-            <div class="date" id="currentDate"></div>
+            <h1><i class="fas fa-calendar-alt"></i> 後台預約查看系統</h1>
+            <div class="date-selector">
+                <select id="dateSelector">
+                    <!-- 動態生成選項 -->
+                </select>
+                <div class="current-date" id="currentDate"></div>
+            </div>
         </div>
         
         <div class="stats">
             <div class="stat-item">
-                <div class="stat-number">8</div>
-                <div class="stat-label">總預約</div>
+                <div class="stat-number" id="totalSlots">14</div>
+                <div class="stat-label">可預約時段</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number">3</div>
-                <div class="stat-label">已完成</div>
+                <div class="stat-number" id="bookedSlots">5</div>
+                <div class="stat-label">已預約</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number">2</div>
-                <div class="stat-label">進行中</div>
+                <div class="stat-number" id="availableSlots">9</div>
+                <div class="stat-label">可用時段</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number">3</div>
-                <div class="stat-label">待確認</div>
+                <div class="stat-number" id="totalAppointments">7</div>
+                <div class="stat-label">總預約數</div>
             </div>
         </div>
         
-        <div class="appointment-list">
-            <div class="appointment-card">
-                <div class="card-header">
-                    <div class="appointment-id">#A001</div>
-                    <div class="status">已確認</div>
+        <div class="timeline-container">
+            <div class="timeline-header">
+                <div>
+                    <i class="fas fa-clock"></i> 預約時間表
                 </div>
-                
-                <div class="appointment-details">
-                    <div class="detail-row">
-                        <i class="fas fa-user detail-icon"></i>
-                        <div class="detail-label">姓名</div>
-                        <div class="detail-value">王小明</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-phone detail-icon"></i>
-                        <div class="detail-label">電話</div>
-                        <div class="detail-value">0912-345-678</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-car detail-icon"></i>
-                        <div class="detail-label">車牌</div>
-                        <div class="detail-value">ABC-1234</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-id-card detail-icon"></i>
-                        <div class="detail-label">用戶ID</div>
-                        <div class="detail-value">U001</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-calendar detail-icon"></i>
-                        <div class="detail-label">預約日期</div>
-                        <div class="detail-value">2025年7月11日</div>
-                    </div>
-                </div>
-                
-                <div class="service-highlight">
-                    <div class="service-title">
-                        <i class="fas fa-wrench"></i> 基礎保養
-                    </div>
-                    <div class="service-time">
-                        <i class="fas fa-clock"></i> 09:00-10:00
-                    </div>
-                </div>
-                
-                <div class="notes-section">
-                    <div class="notes-label">
-                        <i class="fas fa-sticky-note"></i> 備註
-                    </div>
-                    <div class="notes-text">需要更換機油和檢查煞車</div>
-                </div>
-                
-                <div class="create-time">
-                    <i class="fas fa-clock"></i> 建立時間: 2025-07-10 15:30
-                </div>
+                <div class="weekday-info" id="weekdayInfo"></div>
             </div>
             
-            <div class="appointment-card">
-                <div class="card-header">
-                    <div class="appointment-id">#A002</div>
-                    <div class="status">待確認</div>
-                </div>
-                
-                <div class="appointment-details">
-                    <div class="detail-row">
-                        <i class="fas fa-user detail-icon"></i>
-                        <div class="detail-label">姓名</div>
-                        <div class="detail-value">李美華</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-phone detail-icon"></i>
-                        <div class="detail-label">電話</div>
-                        <div class="detail-value">0987-654-321</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-car detail-icon"></i>
-                        <div class="detail-label">車牌</div>
-                        <div class="detail-value">XYZ-5678</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-id-card detail-icon"></i>
-                        <div class="detail-label">用戶ID</div>
-                        <div class="detail-value">U002</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-calendar detail-icon"></i>
-                        <div class="detail-label">預約日期</div>
-                        <div class="detail-value">2025年7月11日</div>
-                    </div>
-                </div>
-                
-                <div class="service-highlight">
-                    <div class="service-title">
-                        <i class="fas fa-search"></i> 全車健檢
-                    </div>
-                    <div class="service-time">
-                        <i class="fas fa-clock"></i> 10:30-12:00
-                    </div>
-                </div>
-                
-                <div class="notes-section">
-                    <div class="notes-label">
-                        <i class="fas fa-sticky-note"></i> 備註
-                    </div>
-                    <div class="notes-text">引擎異音，需要詳細檢查</div>
-                </div>
-                
-                <div class="create-time">
-                    <i class="fas fa-clock"></i> 建立時間: 2025-07-11 08:15
-                </div>
+            <div class="timeline-grid" id="timelineGrid">
+                <!-- 動態生成時間表 -->
             </div>
             
-            <div class="appointment-card">
-                <div class="card-header">
-                    <div class="appointment-id">#A003</div>
-                    <div class="status">已完成</div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color available"></div>
+                    <span>尚未有顧客預約</span>
                 </div>
-                
-                <div class="appointment-details">
-                    <div class="detail-row">
-                        <i class="fas fa-user detail-icon"></i>
-                        <div class="detail-label">姓名</div>
-                        <div class="detail-value">張志強</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-phone detail-icon"></i>
-                        <div class="detail-label">電話</div>
-                        <div class="detail-value">0955-123-456</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-car detail-icon"></i>
-                        <div class="detail-label">車牌</div>
-                        <div class="detail-value">DEF-9999</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-id-card detail-icon"></i>
-                        <div class="detail-label">用戶ID</div>
-                        <div class="detail-value">U003</div>
-                    </div>
-                    <div class="detail-row">
-                        <i class="fas fa-calendar detail-icon"></i>
-                        <div class="detail-label">預約日期</div>
-                        <div class="detail-value">2025年7月11日</div>
-                    </div>
+                <div class="legend-item">
+                    <div class="legend-color booked"></div>
+                    <span>已預約</span>
                 </div>
-                
-                <div class="service-highlight">
-                    <div class="service-title">
-                        <i class="fas fa-cog"></i> 輪胎更換
-                    </div>
-                    <div class="service-time">
-                        <i class="fas fa-clock"></i> 13:00-14:00
-                    </div>
-                </div>
-                
-                <div class="notes-section">
-                    <div class="notes-label">
-                        <i class="fas fa-sticky-note"></i> 備註
-                    </div>
-                    <div class="notes-text">四輪輪胎全部更換完成</div>
-                </div>
-                
-                <div class="create-time">
-                    <i class="fas fa-clock"></i> 建立時間: 2025-07-09 14:20
+                <div class="legend-item">
+                    <div class="legend-color unavailable"></div>
+                    <span>不可預約</span>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // 設定當前日期
-        const today = new Date();
-        const options = { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric', 
-            weekday: 'long' 
-        };
-        document.getElementById('currentDate').textContent = today.toLocaleDateString('zh-TW', options);
+        // 時間段定義
+        const timeSlots = [
+            '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00',
+            'divider', // 中午分隔線
+            '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'
+        ];
 
-        // 添加卡片點擊效果
-        const cards = document.querySelectorAll('.appointment-card');
-        cards.forEach(card => {
-            card.addEventListener('click', function() {
-                this.style.transform = 'scale(0.98)';
-                setTimeout(() => {
-                    this.style.transform = 'translateY(-2px)';
-                }, 150);
+        // 模擬預約資料
+        const appointments = {
+            '2025-07-11': {
+                '09:00': [
+                    { name: '王小明', plate: 'ABC-1234', service: '保養', type: 'maintenance' },
+                    { name: '陳大華', plate: 'DEF-5678', service: '保養', type: 'maintenance' }
+                ],
+                '10:30': [
+                    { name: '李美華', plate: 'XYZ-5678', service: '維修', type: 'repair' }
+                ],
+                '13:30': [
+                    { name: '張志強', plate: 'DEF-9999', service: '其他', type: 'other' }
+                ],
+                '14:30': [
+                    { name: '陳小美', plate: 'GHI-7777', service: '保養', type: 'maintenance' }
+                ],
+                '16:00': [
+                    { name: '林大明', plate: 'JKL-3333', service: '維修', type: 'repair' }
+                ]
+            }
+        };
+
+        let currentSelectedDate = new Date();
+
+        // 初始化頁面
+        function init() {
+            setupDateSelector();
+            updateDisplay();
+        }
+
+        // 設定日期選擇器
+        function setupDateSelector() {
+            const selector = document.getElementById('dateSelector');
+            const today = new Date();
+            
+            // 生成未來兩週的日期選項
+            for (let i = 0; i < 14; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                
+                const option = document.createElement('option');
+                option.value = date.toISOString().split('T')[0];
+                option.textContent = formatDateOption(date);
+                
+                if (i === 0) {
+                    option.selected = true;
+                }
+                
+                selector.appendChild(option);
+            }
+            
+            selector.addEventListener('change', function() {
+                currentSelectedDate = new Date(this.value);
+                updateDisplay();
             });
-        });
+        }
+
+        // 格式化日期選項
+        function formatDateOption(date) {
+            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const weekday = weekdays[date.getDay()];
+            
+            return `${month}/${day} (${weekday})`;
+        }
+
+        // 更新顯示
+        function updateDisplay() {
+            updateCurrentDate();
+            updateWeekdayInfo();
+            generateTimeSlots();
+            updateStats();
+        }
+
+        // 更新當前日期顯示
+        function updateCurrentDate() {
+            const dateElement = document.getElementById('currentDate');
+            const options = { 
+                month: 'long', 
+                day: 'numeric', 
+                weekday: 'long' 
+            };
+            dateElement.textContent = currentSelectedDate.toLocaleDateString('zh-TW', options);
+        }
+
+        // 更新星期資訊
+        function updateWeekdayInfo() {
+            const weekdayInfo = document.getElementById('weekdayInfo');
+            const weekday = currentSelectedDate.getDay();
+            
+            if (weekday === 0) { // 星期日
+                weekdayInfo.textContent = '星期日 - 不營業';
+            } else if (weekday === 6) { // 星期六
+                weekdayInfo.textContent = '星期六 - 僅上午營業';
+            } else {
+                weekdayInfo.textContent = '平日 - 全日營業';
+            }
+        }
+
+        // 生成時間段
+        function generateTimeSlots() {
+            const container = document.getElementById('timelineGrid');
+            container.innerHTML = '';
+            
+            const dateStr = currentSelectedDate.toISOString().split('T')[0];
+            const weekday = currentSelectedDate.getDay();
+            const dayAppointments = appointments[dateStr] || {};
+            
+            timeSlots.forEach(time => {
+                if (time === 'divider') {
+                    // 創建中午分隔線
+                    const dividerLabel = document.createElement('div');
+                    dividerLabel.className = 'time-label';
+                    dividerLabel.style.background = 'transparent';
+                    dividerLabel.style.color = '#6c757d';
+                    dividerLabel.innerHTML = '───';
+                    
+                    const dividerContent = document.createElement('div');
+                    dividerContent.className = 'slot-content';
+                    dividerContent.style.background = 'transparent';
+                    dividerContent.style.border = 'none';
+                    dividerContent.style.padding = '10px';
+                    dividerContent.innerHTML = '<div style="text-align: center; color: #6c757d; font-size: 0.9em;">中午休息</div>';
+                    
+                    container.appendChild(dividerLabel);
+                    container.appendChild(dividerContent);
+                    return;
+                }
+                
+                const isAvailable = isTimeSlotAvailable(time, weekday);
+                const slotAppointments = dayAppointments[time] || [];
+                
+                // 創建時間標籤
+                const timeLabel = document.createElement('div');
+                timeLabel.className = 'time-label';
+                timeLabel.textContent = time;
+                
+                // 創建時間段內容
+                const slotContent = document.createElement('div');
+                slotContent.className = 'slot-content';
+                
+                if (!isAvailable) {
+                    timeLabel.classList.add('unavailable');
+                    slotContent.classList.add('unavailable');
+                    slotContent.innerHTML = '<div class="unavailable-text">不可預約</div>';
+                } else if (slotAppointments.length > 0) {
+                    slotContent.classList.add('booked');
+                    slotAppointments.forEach(appointment => {
+                        const appointmentDiv = document.createElement('div');
+                        appointmentDiv.className = 'appointment-info';
+                        appointmentDiv.innerHTML = `
+                            <div class="customer-name">${appointment.name}</div>
+                            <div class="car-plate">${appointment.plate}</div>
+                            <div class="service-type ${appointment.type}">${appointment.service}</div>
+                        `;
+                        slotContent.appendChild(appointmentDiv);
+                    });
+                    
+                    const capacityInfo = document.createElement('div');
+                    capacityInfo.className = 'capacity-info';
+                    capacityInfo.textContent = `${slotAppointments.length}/3 個預約`;
+                    slotContent.appendChild(capacityInfo);
+                } else {
+                    slotContent.classList.add('available');
+                    slotContent.innerHTML = '<div class="available-text">尚未有顧客預約</div>';
+                }
+                
+                // 創建時間段容器
+                const timeSlot = document.createElement('div');
+                timeSlot.className = 'time-slot';
+                if (!isAvailable) {
+                    timeSlot.classList.add('unavailable');
+                }
+                
+                container.appendChild(timeLabel);
+                container.appendChild(slotContent);
+            });
+        }
+
+        // 檢查時間段是否可用
+        function isTimeSlotAvailable(time, weekday) {
+            // 星期日不營業
+            if (weekday === 0) return false;
+            
+            // 星期六只有上午時段
+            if (weekday === 6) {
+                const hour = parseInt(time.split(':')[0]);
+                return hour < 12;
+            }
+            
+            // 平日全部時段都可用
+            return true;
+        }
+
+        // 更新統計資訊
+        function updateStats() {
+            const dateStr = currentSelectedDate.toISOString().split('T')[0];
+            const weekday = currentSelectedDate.getDay();
+            const dayAppointments = appointments[dateStr] || {};
+            
+            let totalSlots = 0;
+            let bookedSlots = 0;
+            let totalAppointments = 0;
+            
+            timeSlots.forEach(time => {
+                if (time === 'divider') return; // 跳過分隔線
+                
+                if (isTimeSlotAvailable(time, weekday)) {
+                    totalSlots++;
+                    const slotAppointments = dayAppointments[time] || [];
+                    if (slotAppointments.length > 0) {
+                        bookedSlots++;
+                        totalAppointments += slotAppointments.length;
+                    }
+                }
+            });
+            
+            const availableSlots = totalSlots - bookedSlots;
+            
+            document.getElementById('totalSlots').textContent = totalSlots;
+            document.getElementById('bookedSlots').textContent = bookedSlots;
+            document.getElementById('availableSlots').textContent = availableSlots;
+            document.getElementById('totalAppointments').textContent = totalAppointments;
+        }
+
+        // 頁面載入時初始化
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
