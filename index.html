@@ -21,7 +21,7 @@
 
         <!-- 除錯資訊 -->
         <div class="debug-info">
-            <h3>🔍 除錯資訊</h3>
+            <h3>🔍 除錯檢查</h3>
             <div>LIFF 狀態: <span id="liffStatus">檢查中...</span></div>
             <div>用戶ID: <span id="userIdDebug">未取得</span></div>
             <div>API URL: <span id="apiUrlDebug">未設定</span></div>
@@ -316,7 +316,7 @@
             field.parentNode.insertBefore(errorDiv, field.nextSibling);
         }
 
-        // 連接到 Google Apps Script (增強版)
+        // 連接到 Google Apps Script (修正版)
         async function callGAS(action, data) {
             try {
                 updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL);
@@ -328,10 +328,11 @@
 
                 console.log('發送到 GAS:', payload);
 
+                // 修正：使用 POST 方式並正確設定 Content-Type
                 const response = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'text/plain',  // 改為 text/plain
                     },
                     body: JSON.stringify(payload),
                     mode: 'cors'
