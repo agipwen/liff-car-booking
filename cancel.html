@@ -12,7 +12,7 @@
     <div class="container">
         <header class="header">
             <h1>統一汽車</h1>
-            <p>預約查詢系統</p>
+            <p>查看/取消預約</p>
         </header>
 
         <div class="content">
@@ -143,30 +143,30 @@
         }
 
         async function initializeLiff() {
-            try {
-                updateDebugInfo('liffStatus', '初始化中...');
-                
-                // 本地測試模式
-                if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
-                    updateDebugInfo('liffStatus', '本地測試模式');
-                    return;
-                }
-                
-                // 實際的 LIFF 初始化
-                if (typeof liff !== 'undefined') {
-                    await liff.init({ liffId: '2007724265-YJ80zrNX' });
-                    if (liff.isLoggedIn()) {
-                        updateDebugInfo('liffStatus', '已登入');
-                    } else {
-                        updateDebugInfo('liffStatus', '未登入');
-                    }
-                } else {
-                    updateDebugInfo('liffStatus', 'LIFF SDK 未載入');
-                }
-            } catch (error) {
-                logError(error);
-                updateDebugInfo('liffStatus', '失敗: ' + error.message);
+        try {
+            updateDebugInfo('liffStatus', '初始化中...');
+
+            // 本地測試模式
+            if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+            updateDebugInfo('liffStatus', '本地測試模式');
+            return;
             }
+
+            // 實際的 LIFF 初始化
+            if (typeof liff !== 'undefined') {
+            await liff.init({ liffId: '2007724265-4z7Jd6bV' }); // ✅ 正確的 ID
+            if (liff.isLoggedIn()) {
+                updateDebugInfo('liffStatus', '已登入');
+            } else {
+                updateDebugInfo('liffStatus', '未登入');
+            }
+            } else {
+            updateDebugInfo('liffStatus', 'LIFF SDK 未載入');
+            }
+        } catch (error) {
+            logError(error);
+            updateDebugInfo('liffStatus', '失敗: ' + error.message);
+        }
         }
 
         async function callGAS(action, data) {
