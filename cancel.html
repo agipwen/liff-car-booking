@@ -22,6 +22,8 @@
                 <div>最後錯誤: <span id="lastError">無</span></div>
                 <div>請求狀態: <span id="requestStatus">未開始</span></div>
                 <div>LIFF 狀態: <span id="liffStatus">檢查中...</span></div>
+                <div>URL Fragment: <span id="fragmentDebug">檢查中...</span></div>
+                <div>解析參數: <span id="paramsDebug">檢查中...</span></div>
             </div>
 
             <!-- 載入中 -->
@@ -124,18 +126,78 @@
             updateDebugInfo('lastError', error.message || error);
         }
 
+        // 🔧 修改參數獲取方式：支援 fragment 和 query parameters
         function getUrlParameters() {
-            const urlParams = new URLSearchParams(window.location.search);
-            bookingId = urlParams.get('bookingId');
-            userId = urlParams.get('userId');
+            console.log('完整 URL:', window.location.href);
+            console.log('Fragment:', window.location.hash);
+            console.log('Search:', window.location.search);
+            
+            // 更新除錯資訊
+            updateDebugInfo('fragmentDebug', window.location.hash || '無');
+            
+            // 方法1: 嘗試從 fragment (#) 獲取參數
+            if (window.location.hash) {
+                const fragment = window.location.hash.substring(1); // 移除 # 符號
+                console.log('解析 fragment:', fragment);
+                
+                // 檢查是否為 BASE64 編碼的參數
+                if (fragment.startsWith('params=')) {
+                    try {
+                        const base64Params = fragment.substring(7); // 移除 'params='
+                        const decodedParams = JSON.parse(atob(base64Params));
+                        bookingId = decodedParams.bookingId;
+                        userId = decodedParams.userId;
+                        console.log('從 BASE64 解析參數:', { bookingId, userId });
+                    } catch (error) {
+                        console.error('BASE64 解析失敗:', error);
+                    }
+                } else {
+                    // 普通的 key=value&key=value 格式
+                    const fragmentParams = new URLSearchParams(fragment);
+                    bookingId = fragmentParams.get('bookingId');
+                    userId = fragmentParams.get('userId');
+                    console.log('從 fragment 解析參數:', { bookingId, userId });
+                }
+            }
+            
+            // 方法2: 如果 fragment 沒有參數，嘗試從 query parameters 獲取
+            if (!bookingId || !userId) {
+                console.log('嘗試從 query parameters 獲取...');
+                const urlParams = new URLSearchParams(window.location.search);
+                bookingId = bookingId || urlParams.get('bookingId');
+                userId = userId || urlParams.get('userId');
+                console.log('從 query parameters 解析參數:', { bookingId, userId });
+            }
+            
+            // 方法3: 嘗試從 LIFF 獲取參數（如果在 LINE 環境中）
+            if ((!bookingId || !userId) && typeof liff !== 'undefined') {
+                try {
+                    const liffData = liff.getDecodedIDToken();
+                    console.log('LIFF 解碼資料:', liffData);
+                    // 這裡可以根據您的需求從 LIFF 取得 userId
+                    if (liffData && liffData.sub) {
+                        userId = userId || liffData.sub;
+                        console.log('從 LIFF 取得 userId:', userId);
+                    }
+                } catch (error) {
+                    console.log('無法從 LIFF 取得參數:', error);
+                }
+            }
 
-            console.log('URL 參數:', { bookingId, userId });
-            // updateDebugInfo('bookingIdParam', bookingId || '未提供');
-            // updateDebugInfo('userIdParam', userId || '未提供');
+            console.log('最終解析結果:', { bookingId, userId });
+            updateDebugInfo('paramsDebug', `bookingId: ${bookingId || '無'}, userId: ${userId || '無'}`);
 
             if (!bookingId || !userId) {
-                showError('缺少必要的 bookingId 或 userId 參數');
+                const errorMsg = '缺少必要的參數 - bookingId: ' + (bookingId || '無') + ', userId: ' + (userId || '無');
+                showError(errorMsg);
                 document.getElementById('loading').style.display = 'none';
+                
+                // 顯示除錯資訊
+                const debugInfo = document.querySelector('.debug-info');
+                if (debugInfo) {
+                    debugInfo.style.display = 'block';
+                }
+                
                 return false;
             }
 
@@ -143,30 +205,42 @@
         }
 
         async function initializeLiff() {
-        try {
-            updateDebugInfo('liffStatus', '初始化中...');
+            try {
+                updateDebugInfo('liffStatus', '初始化中...');
 
-            // 本地測試模式
-            if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
-            updateDebugInfo('liffStatus', '本地測試模式');
-            return;
-            }
+                // 本地測試模式
+                if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+                    updateDebugInfo('liffStatus', '本地測試模式');
+                    return;
+                }
 
-            // 實際的 LIFF 初始化
-            if (typeof liff !== 'undefined') {
-            await liff.init({ liffId: '2007724265-4z7Jd6bV' }); // ✅ 正確的 ID
-            if (liff.isLoggedIn()) {
-                updateDebugInfo('liffStatus', '已登入');
-            } else {
-                updateDebugInfo('liffStatus', '未登入');
+                // 實際的 LIFF 初始化
+                if (typeof liff !== 'undefined') {
+                    await liff.init({ liffId: '2007724265-4z7Jd6bV' });
+                    if (liff.isLoggedIn()) {
+                        updateDebugInfo('liffStatus', '已登入');
+                        
+                        // 🔧 嘗試從 LIFF 獲取 userId（如果前面沒有取得）
+                        if (!userId) {
+                            try {
+                                const profile = await liff.getProfile();
+                                userId = profile.userId;
+                                console.log('從 LIFF Profile 取得 userId:', userId);
+                                updateDebugInfo('paramsDebug', `bookingId: ${bookingId || '無'}, userId: ${userId || '無'}`);
+                            } catch (error) {
+                                console.log('無法從 LIFF Profile 取得 userId:', error);
+                            }
+                        }
+                    } else {
+                        updateDebugInfo('liffStatus', '未登入');
+                    }
+                } else {
+                    updateDebugInfo('liffStatus', 'LIFF SDK 未載入');
+                }
+            } catch (error) {
+                logError(error);
+                updateDebugInfo('liffStatus', '失敗: ' + error.message);
             }
-            } else {
-            updateDebugInfo('liffStatus', 'LIFF SDK 未載入');
-            }
-        } catch (error) {
-            logError(error);
-            updateDebugInfo('liffStatus', '失敗: ' + error.message);
-        }
         }
 
         async function callGAS(action, data) {
@@ -175,22 +249,17 @@
                 console.log('發送到 GAS 的資料:', payload);
                 updateDebugInfo('requestStatus', '發送中...');
 
-                // 🔧 修改 fetch 選項，移除可能造成預檢請求的標頭
                 const response = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
                     body: JSON.stringify(payload),
-                    // 移除 Content-Type 標頭以避免預檢請求
                     redirect: 'follow'
                 });
-
-                // updateDebugInfo('responseStatus', `HTTP ${response.status}`);
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const result = await response.json();
-                // updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL);
                 updateDebugInfo('requestStatus', '完成');
                 
                 console.log('GAS 回應:', result);
@@ -234,7 +303,6 @@
         function displayBookingData() {
             console.log('顯示預約資料:', bookingData);
             
-            // 確保所有欄位都有值
             document.getElementById('displayBookingId').textContent = bookingData.bookingId || '無';
             document.getElementById('customerName').textContent = bookingData.name || '無';
             document.getElementById('customerPhone').textContent = bookingData.phone || '無';
@@ -244,7 +312,6 @@
             document.getElementById('serviceType').textContent = bookingData.serviceType || '無';
             document.getElementById('appointmentNote').textContent = bookingData.note || '無';
             
-            // 處理建立時間
             const createdTime = bookingData.timestamp || bookingData.createdAt || bookingData.createdTime;
             if (createdTime) {
                 document.getElementById('createdTime').textContent = formatDateTime(createdTime);
@@ -272,29 +339,23 @@
             if (!timeString) return '無';
             
             try {
-                // 如果已經是標準時間格式 (HH:MM 或 H:MM)
                 if (timeString.match(/^\d{1,2}:\d{2}$/)) {
                     return timeString;
                 }
                 
-                // 如果是 ISO 格式的時間戳 (通常是錯誤的)
                 if (timeString.includes('T') && timeString.includes('Z')) {
                     const date = new Date(timeString);
                     
-                    // 檢查是否為有效日期
                     if (isNaN(date.getTime())) {
                         return '時間格式錯誤';
                     }
                     
-                    // 如果是 1899 年，這通常是 Excel 序列號問題
                     if (date.getFullYear() < 1900) {
-                        // 嘗試從時間戳中提取時間部分
                         const timeOnly = date.toISOString().split('T')[1];
                         const timePart = timeOnly.split(':');
                         const hours = parseInt(timePart[0]);
                         const minutes = parseInt(timePart[1]);
                         
-                        // 調整時區 (假設是 UTC+8)
                         let adjustedHours = hours + 8;
                         if (adjustedHours >= 24) adjustedHours -= 24;
                         if (adjustedHours < 0) adjustedHours += 24;
@@ -302,16 +363,13 @@
                         return `${String(adjustedHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
                     }
                     
-                    // 正常的 ISO 時間戳，轉換為台灣時間
                     const taiwanTime = new Date(date.getTime() + (8 * 60 * 60 * 1000));
                     return `${String(taiwanTime.getUTCHours()).padStart(2, '0')}:${String(taiwanTime.getUTCMinutes()).padStart(2, '0')}`;
                 }
                 
-                // 如果是數字（Excel 序列號）
                 if (!isNaN(timeString)) {
                     const num = parseFloat(timeString);
                     
-                    // Excel 時間序列號轉換（小數部分代表一天中的時間）
                     if (num >= 0 && num < 1) {
                         const totalMinutes = Math.round(num * 24 * 60);
                         const hours = Math.floor(totalMinutes / 60);
@@ -320,7 +378,6 @@
                     }
                 }
                 
-                // 其他情況，嘗試解析為時間
                 console.log('未知時間格式:', timeString);
                 return timeString;
                 
@@ -334,14 +391,11 @@
             if (!dateString) return '無';
             
             try {
-                // 處理不同的日期格式
                 let date;
                 if (dateString.includes('/')) {
-                    // 格式：2025/07/12
                     const parts = dateString.split('/');
                     date = new Date(parts[0], parts[1] - 1, parts[2]);
                 } else if (dateString.includes('-')) {
-                    // 格式：2025-07-12
                     date = new Date(dateString);
                 } else {
                     return dateString;
@@ -408,7 +462,6 @@
             }
         }
 
-        // 測試 API 連接
         async function testApiConnection() {
             try {
                 console.log('測試 API 連接...');
@@ -431,18 +484,25 @@
         document.addEventListener('DOMContentLoaded', function () {
             console.log('頁面載入完成，開始初始化...');
             
-            // 先測試 API 連接
             testApiConnection();
             
-            if (!getUrlParameters()) return;
-            
+            // 🔧 先初始化 LIFF，再解析參數
             initializeLiff().then(() => {
-                console.log('LIFF 初始化完成，開始查詢預約資料...');
-                fetchBookingData();
+                console.log('LIFF 初始化完成');
+                
+                // 解析 URL 參數
+                if (getUrlParameters()) {
+                    console.log('參數解析成功，開始查詢預約資料...');
+                    fetchBookingData();
+                } else {
+                    console.log('參數解析失敗');
+                }
             }).catch(error => {
                 console.error('LIFF 初始化失敗:', error);
-                // 即使 LIFF 初始化失敗，仍然嘗試查詢預約資料
-                fetchBookingData();
+                // 即使 LIFF 初始化失敗，仍然嘗試解析參數
+                if (getUrlParameters()) {
+                    fetchBookingData();
+                }
             });
 
             // 事件監聽器
@@ -456,17 +516,21 @@
                 document.getElementById('cancelModal').style.display = 'none';
             });
 
-            document.getElementById('closeBtn').addEventListener('click', () => {
-                if (typeof liff !== 'undefined' && liff.isInClient()) {
-                    liff.closeWindow();
-                } else {
-                    window.history.back();
-                }
-            });
-
             document.getElementById('cancelModal').addEventListener('click', function(e) {
                 if (e.target === this) this.style.display = 'none';
             });
+
+            // 🔧 移除不存在的 closeBtn 事件監聽器
+            const closeBtn = document.getElementById('closeBtn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    if (typeof liff !== 'undefined' && liff.isInClient()) {
+                        liff.closeWindow();
+                    } else {
+                        window.history.back();
+                    }
+                });
+            }
         });
     </script>
 </body>
