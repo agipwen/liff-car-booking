@@ -24,6 +24,14 @@
                 <div>API URL: <span id="apiUrlDebug">未設定</span></div>
                 <div>LIFF 狀態: <span id="liffStatus">檢查中...</span></div>
                 <div>最後錯誤: <span id="lastError">無</span></div>
+                <div>請求狀態: <span id="requestStatus">未開始</span></div>
+                <div>回應狀態: <span id="responseStatus">未收到</span></div>
+            </div>
+
+            <!-- 原始回應 -->
+            <div id="rawResponseContainer" style="display: none;">
+                <h4>原始 API 回應:</h4>
+                <div id="rawResponse" class="raw-response"></div>
             </div>
 
             <!-- 載入中 -->
@@ -78,7 +86,7 @@
                         <div class="detail-label">服務項目</div>
                         <div class="detail-value" id="serviceType"></div>
                     </div>
-                    <div class="detail-item" style="grid-column: 1 / -1;">
+                    <div class="detail-item">
                         <div class="detail-label">備註</div>
                         <div class="detail-value" id="appointmentNote">無</div>
                     </div>
@@ -129,11 +137,19 @@
             updateDebugInfo('lastError', error.message || error);
         }
 
+        function showRawResponse(response) {
+            const container = document.getElementById('rawResponseContainer');
+            const rawDiv = document.getElementById('rawResponse');
+            rawDiv.textContent = JSON.stringify(response, null, 2);
+            container.style.display = 'block';
+        }
+
         function getUrlParameters() {
             const urlParams = new URLSearchParams(window.location.search);
             bookingId = urlParams.get('bookingId');
             userId = urlParams.get('userId');
 
+            console.log('URL 參數:', { bookingId, userId });
             updateDebugInfo('bookingIdParam', bookingId || '未提供');
             updateDebugInfo('userIdParam', userId || '未提供');
 
@@ -149,7 +165,8 @@
         async function initializeLiff() {
             try {
                 updateDebugInfo('liffStatus', '初始化中...');
-                // 模擬 LIFF 初始化（在本地測試時）
+                
+                // 本地測試模式
                 if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
                     updateDebugInfo('liffStatus', '本地測試模式');
                     return;
@@ -176,6 +193,7 @@
             try {
                 const payload = { action, ...data };
                 console.log('發送到 GAS 的資料:', payload);
+                updateDebugInfo('requestStatus', '發送中...');
 
                 const response = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
@@ -185,17 +203,24 @@
                     body: JSON.stringify(payload)
                 });
 
+                updateDebugInfo('responseStatus', `HTTP ${response.status}`);
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const result = await response.json();
                 updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL);
+                updateDebugInfo('requestStatus', '完成');
+                
                 console.log('GAS 回應:', result);
+                showRawResponse(result);
+                
                 return result;
 
             } catch (error) {
                 console.error('GAS API 調用失敗:', error);
+                updateDebugInfo('requestStatus', '失敗: ' + error.message);
                 logError(error);
                 throw error;
             }
@@ -203,7 +228,8 @@
 
         async function fetchBookingData() {
             try {
-                console.log('開始查詢預約資料...');
+                console.log('開始查詢預約資料...', { bookingId, userId });
+                
                 const result = await callGAS('getBooking', {
                     bookingId: bookingId,
                     userId: userId
@@ -229,16 +255,17 @@
         function displayBookingData() {
             console.log('顯示預約資料:', bookingData);
             
-            document.getElementById('displayBookingId').textContent = bookingData.bookingId;
-            document.getElementById('customerName').textContent = bookingData.name;
-            document.getElementById('customerPhone').textContent = bookingData.phone;
-            document.getElementById('carPlate').textContent = bookingData.plate;
+            // 確保所有欄位都有值
+            document.getElementById('displayBookingId').textContent = bookingData.bookingId || '無';
+            document.getElementById('customerName').textContent = bookingData.name || '無';
+            document.getElementById('customerPhone').textContent = bookingData.phone || '無';
+            document.getElementById('carPlate').textContent = bookingData.plate || '無';
             document.getElementById('appointmentDate').textContent = formatDate(bookingData.date);
-            document.getElementById('appointmentTime').textContent = bookingData.time;
-            document.getElementById('serviceType').textContent = bookingData.serviceType;
+            document.getElementById('appointmentTime').textContent = bookingData.time || '無';
+            document.getElementById('serviceType').textContent = bookingData.serviceType || '無';
             document.getElementById('appointmentNote').textContent = bookingData.note || '無';
             
-            // 處理建立時間 - 支援多種格式
+            // 處理建立時間
             const createdTime = bookingData.timestamp || bookingData.createdAt || bookingData.createdTime;
             if (createdTime) {
                 document.getElementById('createdTime').textContent = formatDateTime(createdTime);
@@ -263,13 +290,28 @@
         }
 
         function formatDate(dateString) {
+            if (!dateString) return '無';
+            
             try {
-                const date = new Date(dateString);
-                if (isNaN(date.getTime())) {
-                    return dateString; // 如果無法解析，直接返回原字串
+                // 處理不同的日期格式
+                let date;
+                if (dateString.includes('/')) {
+                    // 格式：2025/07/12
+                    const parts = dateString.split('/');
+                    date = new Date(parts[0], parts[1] - 1, parts[2]);
+                } else if (dateString.includes('-')) {
+                    // 格式：2025-07-12
+                    date = new Date(dateString);
+                } else {
+                    return dateString;
                 }
+                
+                if (isNaN(date.getTime())) {
+                    return dateString;
+                }
+                
                 const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-                return `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} (${weekDays[date.getDay()]})`;
+                return `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} (${weekDays[date.getDay()]})`;
             } catch (error) {
                 console.error('日期格式化錯誤:', error);
                 return dateString;
@@ -277,12 +319,14 @@
         }
 
         function formatDateTime(timestamp) {
+            if (!timestamp) return '無';
+            
             try {
                 const date = new Date(timestamp);
                 if (isNaN(date.getTime())) {
-                    return timestamp; // 如果無法解析，直接返回原字串
+                    return timestamp;
                 }
-                return `${date.getFullYear()}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getDate().toString().padStart(2,'0')} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+                return `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
             } catch (error) {
                 console.error('時間格式化錯誤:', error);
                 return timestamp;
@@ -323,8 +367,31 @@
             }
         }
 
+        // 測試 API 連接
+        async function testApiConnection() {
+            try {
+                console.log('測試 API 連接...');
+                updateDebugInfo('requestStatus', '測試連接...');
+                
+                const result = await callGAS('testConnection', {});
+                console.log('API 連接測試結果:', result);
+                
+                if (result.success) {
+                    updateDebugInfo('requestStatus', 'API 連接正常');
+                } else {
+                    updateDebugInfo('requestStatus', 'API 連接失敗');
+                }
+            } catch (error) {
+                console.error('API 連接測試失敗:', error);
+                updateDebugInfo('requestStatus', 'API 連接測試失敗');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             console.log('頁面載入完成，開始初始化...');
+            
+            // 先測試 API 連接
+            testApiConnection();
             
             if (!getUrlParameters()) return;
             
