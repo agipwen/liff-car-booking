@@ -18,7 +18,7 @@
         <div class="content">
             <!-- 除錯資訊 -->
             <div class="debug-info">
-                <h3>🔍 除錯檢查</h3>
+                <h3>🔍 狀態檢查</h3>
                 <div>預約編號: <span id="bookingIdParam">未取得</span></div>
                 <div>用戶ID: <span id="userIdParam">未取得</span></div>
                 <div>API URL: <span id="apiUrlDebug">未設定</span></div>
@@ -121,7 +121,7 @@
     </div>
 
     <script>
-        // 你需要修改這個 URL 為你的 GAS Web App URL
+        // 🔧 請將此處替換為您重新部署後的新 URL
         const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzAhNvgzW5ZqPteINKHd69LpE3rK2L28htSfENqKncvgOh3UKh5DOEkaUEpp8Pj86BF/exec';
         let bookingId = null;
         let userId = null;
@@ -195,12 +195,12 @@
                 console.log('發送到 GAS 的資料:', payload);
                 updateDebugInfo('requestStatus', '發送中...');
 
+                // 🔧 修改 fetch 選項，移除可能造成預檢請求的標頭
                 const response = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    // 移除 Content-Type 標頭以避免預檢請求
+                    redirect: 'follow'
                 });
 
                 updateDebugInfo('responseStatus', `HTTP ${response.status}`);
