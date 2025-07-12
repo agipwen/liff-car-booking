@@ -16,22 +16,12 @@
         </header>
 
         <div class="content">
-            <!-- 除錯資訊 -->
-            <div class="debug-info">
+            <!-- 除錯資訊 (隱藏) -->
+            <div class="debug-info" style="display: none;">
                 <h3>🔍 狀態檢查</h3>
-                <div>預約編號: <span id="bookingIdParam">未取得</span></div>
-                <div>用戶ID: <span id="userIdParam">未取得</span></div>
-                <div>API URL: <span id="apiUrlDebug">未設定</span></div>
-                <div>LIFF 狀態: <span id="liffStatus">檢查中...</span></div>
                 <div>最後錯誤: <span id="lastError">無</span></div>
                 <div>請求狀態: <span id="requestStatus">未開始</span></div>
-                <div>回應狀態: <span id="responseStatus">未收到</span></div>
-            </div>
-
-            <!-- 原始回應 -->
-            <div id="rawResponseContainer" style="display: none;">
-                <h4>原始 API 回應:</h4>
-                <div id="rawResponse" class="raw-response"></div>
+                <div>LIFF 狀態: <span id="liffStatus">檢查中...</span></div>
             </div>
 
             <!-- 載入中 -->
@@ -100,9 +90,6 @@
                     <button id="cancelBtn" class="btn btn-danger">
                         <i class="fas fa-times"></i> 取消預約
                     </button>
-                    <button id="closeBtn" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> 返回
-                    </button>
                 </div>
             </div>
         </div>
@@ -137,21 +124,14 @@
             updateDebugInfo('lastError', error.message || error);
         }
 
-        function showRawResponse(response) {
-            const container = document.getElementById('rawResponseContainer');
-            const rawDiv = document.getElementById('rawResponse');
-            rawDiv.textContent = JSON.stringify(response, null, 2);
-            container.style.display = 'block';
-        }
-
         function getUrlParameters() {
             const urlParams = new URLSearchParams(window.location.search);
             bookingId = urlParams.get('bookingId');
             userId = urlParams.get('userId');
 
             console.log('URL 參數:', { bookingId, userId });
-            updateDebugInfo('bookingIdParam', bookingId || '未提供');
-            updateDebugInfo('userIdParam', userId || '未提供');
+            // updateDebugInfo('bookingIdParam', bookingId || '未提供');
+            // updateDebugInfo('userIdParam', userId || '未提供');
 
             if (!bookingId || !userId) {
                 showError('缺少必要的 bookingId 或 userId 參數');
@@ -203,18 +183,17 @@
                     redirect: 'follow'
                 });
 
-                updateDebugInfo('responseStatus', `HTTP ${response.status}`);
+                // updateDebugInfo('responseStatus', `HTTP ${response.status}`);
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const result = await response.json();
-                updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL);
+                // updateDebugInfo('apiUrlDebug', GAS_WEB_APP_URL);
                 updateDebugInfo('requestStatus', '完成');
                 
                 console.log('GAS 回應:', result);
-                showRawResponse(result);
                 
                 return result;
 
@@ -261,7 +240,7 @@
             document.getElementById('customerPhone').textContent = bookingData.phone || '無';
             document.getElementById('carPlate').textContent = bookingData.plate || '無';
             document.getElementById('appointmentDate').textContent = formatDate(bookingData.date);
-            document.getElementById('appointmentTime').textContent = bookingData.time || '無';
+            document.getElementById('appointmentTime').textContent = formatTime(bookingData.time) || '無';
             document.getElementById('serviceType').textContent = bookingData.serviceType || '無';
             document.getElementById('appointmentNote').textContent = bookingData.note || '無';
             
@@ -287,6 +266,68 @@
             }
 
             document.getElementById('bookingDetails').style.display = 'block';
+        }
+
+        function formatTime(timeString) {
+            if (!timeString) return '無';
+            
+            try {
+                // 如果已經是標準時間格式 (HH:MM 或 H:MM)
+                if (timeString.match(/^\d{1,2}:\d{2}$/)) {
+                    return timeString;
+                }
+                
+                // 如果是 ISO 格式的時間戳 (通常是錯誤的)
+                if (timeString.includes('T') && timeString.includes('Z')) {
+                    const date = new Date(timeString);
+                    
+                    // 檢查是否為有效日期
+                    if (isNaN(date.getTime())) {
+                        return '時間格式錯誤';
+                    }
+                    
+                    // 如果是 1899 年，這通常是 Excel 序列號問題
+                    if (date.getFullYear() < 1900) {
+                        // 嘗試從時間戳中提取時間部分
+                        const timeOnly = date.toISOString().split('T')[1];
+                        const timePart = timeOnly.split(':');
+                        const hours = parseInt(timePart[0]);
+                        const minutes = parseInt(timePart[1]);
+                        
+                        // 調整時區 (假設是 UTC+8)
+                        let adjustedHours = hours + 8;
+                        if (adjustedHours >= 24) adjustedHours -= 24;
+                        if (adjustedHours < 0) adjustedHours += 24;
+                        
+                        return `${String(adjustedHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    }
+                    
+                    // 正常的 ISO 時間戳，轉換為台灣時間
+                    const taiwanTime = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+                    return `${String(taiwanTime.getUTCHours()).padStart(2, '0')}:${String(taiwanTime.getUTCMinutes()).padStart(2, '0')}`;
+                }
+                
+                // 如果是數字（Excel 序列號）
+                if (!isNaN(timeString)) {
+                    const num = parseFloat(timeString);
+                    
+                    // Excel 時間序列號轉換（小數部分代表一天中的時間）
+                    if (num >= 0 && num < 1) {
+                        const totalMinutes = Math.round(num * 24 * 60);
+                        const hours = Math.floor(totalMinutes / 60);
+                        const minutes = totalMinutes % 60;
+                        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    }
+                }
+                
+                // 其他情況，嘗試解析為時間
+                console.log('未知時間格式:', timeString);
+                return timeString;
+                
+            } catch (error) {
+                console.error('時間格式化錯誤:', error, '原始值:', timeString);
+                return '時間格式錯誤';
+            }
         }
 
         function formatDate(dateString) {
