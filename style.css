@@ -45,7 +45,7 @@ body {
     padding: 15px;
     border-radius: 8px;
     margin-bottom: 20px;
-    border-left: 4px solid #3498db;
+    border-left: 4px solid #649dee;
 }
 
 .shop-info p {
@@ -85,7 +85,7 @@ body {
 .form-group select:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: #649dee;
 }
 
 .form-group textarea {
@@ -121,12 +121,12 @@ body {
 
 .date-button:hover {
     background: #e9ecef;
-    border-color: #3498db;
+    border-color: #649dee;
 }
 
 .date-button.selected {
-    background: #3498db;
-    border-color: #3498db;
+    background: #649dee;
+    border-color: #649dee;
     color: white;
 }
 
@@ -382,4 +382,28 @@ body {
     padding: 10px;
     border-radius: 5px;
     overflow-x: auto;
+}
+
+.swal-popup-custom {
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+}
+
+.swal-title-custom {
+color: #27ae60 !important;
+font-size: 1.8rem !important;
+}
+
+@media (max-width: 480px) {
+.swal2-popup {
+    width: 95% !important;
+    padding: 20px !important;
+}
+
+.swal2-title {
+    font-size: 1.5rem !important;
+}
+
+.swal2-html-container {
+    font-size: 0.9rem !important;
+}
 }

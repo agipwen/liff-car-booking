@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>統一汽車 - 線上預約</title>
     <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <!-- <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script> -->
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.1/sweetalert2.all.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.1/sweetalert2.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -83,16 +86,6 @@
         <div id="loading" class="loading-overlay">
             <div class="loading-spinner"></div>
             <p>預約處理中...</p>
-        </div>
-
-        <!-- 成功訊息 -->
-        <div id="successMessage" class="success-message">
-            <div>
-                <div class="success-icon"><i class="fa-solid fa-circle-check" style="color:#27ae60;"></i></div>
-                <h2>預約成功！</h2>
-                <p>您的預約編號：<span id="bookingId"></span></p>
-                <button id="closeBtn" class="close-btn">關閉</button>
-            </div>
         </div>
     </div>
 
@@ -225,7 +218,7 @@
             updateTimeSlots();
         }
 
-        // 更新時段選項
+        // 更新時段選項 (修改版 - 加入當日時間過濾)
         function updateTimeSlots() {
             const timeSelect = document.getElementById('time');
             
@@ -234,25 +227,57 @@
                 return;
             }
 
-            const date = new Date(selectedDate);
-            const dayOfWeek = date.getDay();
+            const selectedDateObj = new Date(selectedDate);
+            const today = new Date();
+            const isToday = selectedDateObj.toDateString() === today.toDateString();
+            const currentTime = today.getHours() * 60 + today.getMinutes(); // 轉換為分鐘數便於比較
+            
+            const dayOfWeek = selectedDateObj.getDay();
 
             timeSelect.innerHTML = '<option value="">請選擇時段</option>';
 
+            // 加入上午時段
             timeSlots.morning.forEach(time => {
-                const option = document.createElement('option');
-                option.value = time;
-                option.textContent = time;
-                timeSelect.appendChild(option);
-            });
-
-            if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-                timeSlots.afternoon.forEach(time => {
+                const [hours, minutes] = time.split(':').map(Number);
+                const timeInMinutes = hours * 60 + minutes;
+                
+                // 如果是今天，檢查時間是否已過
+                // 加入30分鐘的緩衝時間，確保客戶有足夠時間準備
+                const shouldShow = !isToday || (timeInMinutes > currentTime + 30);
+                
+                if (shouldShow) {
                     const option = document.createElement('option');
                     option.value = time;
                     option.textContent = time;
                     timeSelect.appendChild(option);
+                }
+            });
+
+            // 加入下午時段（週一到週五）
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                timeSlots.afternoon.forEach(time => {
+                    const [hours, minutes] = time.split(':').map(Number);
+                    const timeInMinutes = hours * 60 + minutes;
+                    
+                    // 如果是今天，檢查時間是否已過
+                    const shouldShow = !isToday || (timeInMinutes > currentTime + 30);
+                    
+                    if (shouldShow) {
+                        const option = document.createElement('option');
+                        option.value = time;
+                        option.textContent = time;
+                        timeSelect.appendChild(option);
+                    }
                 });
+            }
+            
+            // 如果當日沒有可選擇的時段，顯示提示
+            if (isToday && timeSelect.options.length === 1) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '今日已無可預約時段';
+                option.disabled = true;
+                timeSelect.appendChild(option);
             }
         }
 
@@ -359,6 +384,49 @@
             }
         }
 
+        // 使用 SweetAlert2 顯示成功訊息
+        function showSuccessMessage(bookingId) {
+            Swal.fire({
+                icon: 'success',
+                title: '預約成功！',
+                html: `
+                    <div style="font-size: 1.1rem; color: #2c3e50; margin: 20px 0;">
+                        <p style="margin-bottom: 10px;">您的預約編號：</p>
+                        <p style="font-weight: bold; color: #e74c3c; font-size: 1.3rem;">${bookingId}</p>
+                    </div>
+                `,
+                confirmButtonText: '關閉',
+                confirmButtonColor: '#3498db',
+                backdrop: 'rgba(0,0,0,0.6)',
+                customClass: {
+                    popup: 'swal-popup-custom',
+                    title: 'swal-title-custom'
+                },
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                width: '90%',
+                maxWidth: '400px'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    closeSuccessMessage();
+                }
+            });
+        }
+
+        // 使用 SweetAlert2 顯示錯誤訊息
+        function showErrorMessage(message) {
+            Swal.fire({
+                icon: 'error',
+                title: '預約失敗',
+                text: message,
+                confirmButtonText: '確定',
+                confirmButtonColor: '#e74c3c',
+                backdrop: 'rgba(0,0,0,0.6)',
+                width: '90%',
+                maxWidth: '400px'
+            });
+        }
+
         // 提交表單
         async function submitForm(event) {
             event.preventDefault();
@@ -410,14 +478,14 @@
                 let errorMessage = '預約失敗，請稍後再試';
                 
                 if (error.message.includes('HTTP')) {
-                    errorMessage += '\n\n伺服器連接問題，請檢查網路連線';
+                    errorMessage = '伺服器連接問題，請檢查網路連線';
                 } else if (error.message.includes('Failed to fetch')) {
-                    errorMessage += '\n\n網路連接失敗，請檢查網路設定';
-                } else {
-                    errorMessage += '\n\n錯誤詳情：' + error.message;
+                    errorMessage = '網路連接失敗，請檢查網路設定';
+                } else if (error.message) {
+                    errorMessage = error.message;
                 }
                 
-                alert(errorMessage);
+                showErrorMessage(errorMessage);
                 
             } finally {
                 loading.style.display = 'none';
@@ -426,16 +494,8 @@
             }
         }
 
-        // 顯示成功訊息
-        function showSuccessMessage(bookingId) {
-            document.getElementById('bookingId').textContent = bookingId;
-            document.getElementById('successMessage').style.display = 'block';
-        }
-
         // 關閉成功訊息
         function closeSuccessMessage() {
-            document.getElementById('successMessage').style.display = 'none';
-            
             document.getElementById('bookingForm').reset();
             selectedDate = null;
             document.querySelectorAll('.date-button').forEach(btn => {
@@ -457,7 +517,6 @@
             createDateButtons();
             
             document.getElementById('bookingForm').addEventListener('submit', submitForm);
-            document.getElementById('closeBtn').addEventListener('click', closeSuccessMessage);
             
             console.log('初始化完成');
         });
