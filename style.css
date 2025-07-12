@@ -112,7 +112,7 @@ body {
     background: #f8f9fa;
     border: 2px solid #dee2e6;
     border-radius: 8px;
-    padding: 12px 8px;
+    padding: 8px 6px;
     cursor: pointer;
     transition: all 0.3s ease;
     text-align: center;
@@ -139,11 +139,11 @@ body {
 
 .date-button .date-main {
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.9rem;
 }
 
 .date-button .date-day {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     margin-top: 2px;
 }
 
@@ -293,6 +293,19 @@ body {
 
     .date-buttons {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .date-button {
+        padding: 6px 4px;
+        font-size: 0.8rem;
+    }
+
+    .date-button .date-main {
+        font-size: 0.8rem;
+    }
+
+    .date-button .date-day {
+        font-size: 0.7rem;
     }
 }
 

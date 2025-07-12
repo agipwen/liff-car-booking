@@ -49,7 +49,7 @@
                 <label>預約日期 *</label>
                 <div class="date-buttons" id="dateButtons"></div>
                 <input type="hidden" id="dateInput" name="date" required>
-                <small class="hint">可預約未來7天內，週日不開放</small>
+                <small class="hint">可預約未來14天內，週日不開放</small>
             </div>
 
             <div class="form-group">
@@ -176,7 +176,7 @@
             
             dateButtonsContainer.innerHTML = '';
             
-            for (let i = 0; i < 7; i++) {
+            for (let i = 0; i < 14; i++) {
                 const date = new Date(today);
                 date.setDate(today.getDate() + i);
                 
