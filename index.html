@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>統一汽車 - 線上預約</title>
     <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <!-- <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script> -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
         </header>
 
         <!-- 除錯資訊 -->
-        <div class="debug-info">
+        <div class="debug-info" style="display:none">
             <h3>🔍 除錯檢查</h3>
             <div>LIFF 狀態: <span id="liffStatus">檢查中...</span></div>
             <div>用戶ID: <span id="userIdDebug">未取得</span></div>
@@ -71,8 +71,9 @@
             </div>
 
             <div class="form-group">
-                <label for="note">備註（*初次來訪請填寫車輛廠牌及車型）</label>
-                <textarea id="note" name="note" placeholder="其他需要說明的事項（選填）"></textarea>
+                <label for="note">備註（新客戶請提供車輛廠牌與車型）</label>
+                <textarea id="note" name="note" placeholder=""></textarea>
+                <small class="hint" style="color:red">初次來訪車輛，請攜帶車子的綠色行照以便資料登入</small>
             </div>
 
             <button type="submit" class="submit-btn">確認預約</button>
