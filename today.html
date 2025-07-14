@@ -22,15 +22,15 @@
         <div class="stats">
             <div class="stat-item">
                 <div class="stat-number" id="morningAppointments">0</div>
-                <div class="stat-label">上午預約數</div>
+                <div class="stat-label">上午</div>
             </div>
             <div class="stat-item">
                 <div class="stat-number" id="afternoonAppointments">0</div>
-                <div class="stat-label">下午預約數</div>
+                <div class="stat-label">下午</div>
             </div>
             <div class="stat-item">
                 <div class="stat-number" id="totalAppointments">0</div>
-                <div class="stat-label">今日總預約數</div>
+                <div class="stat-label">總預約數</div>
             </div>
         </div>
         
@@ -40,6 +40,17 @@
                     <i class="fas fa-clock"></i> 預約時間表
                 </div>
                 <div class="weekday-info" id="weekdayInfo"></div>
+            </div>
+
+            <div class="update-info">
+                <div class="last-update">
+                    <i class="fas fa-clock"></i>
+                    <span id="lastUpdateTime">載入中...</span>
+                </div>
+                <button class="reload-btn" id="reloadBtn">
+                    <i class="fas fa-sync-alt"></i>
+                    重新載入
+                </button>
             </div>
             
             <!-- 美化的載入指示器 -->
@@ -95,12 +106,82 @@
         // 全局變數
         let currentSelectedDate = new Date();
         let currentDateBookings = [];
+        let lastUpdateTime = null;
 
         // 初始化頁面
         function init() {
             setupDateSelector();
             updateDisplay();
+            setupReloadButton();
         }
+
+        // 新增：設置重載按鈕事件監聽器
+        function setupReloadButton() {
+            const reloadBtn = document.getElementById('reloadBtn');
+            if (reloadBtn) {
+                reloadBtn.addEventListener('click', handleReload);
+            }
+        }
+
+        // 新增：處理重載按鈕點擊
+        async function handleReload() {
+            const reloadBtn = document.getElementById('reloadBtn');
+            
+            try {
+                // 禁用按鈕並顯示載入狀態
+                setReloadButtonState(true);
+                
+                // 重新載入數據
+                await updateDisplay();
+                
+                // 顯示成功提示（可選）
+                showToast('資料已更新', 'success');
+                
+            } catch (error) {
+                console.error('重載失敗:', error);
+                showToast('重載失敗，請稍後再試', 'error');
+            } finally {
+                // 恢復按鈕狀態
+                setReloadButtonState(false);
+            }
+        }
+
+        // 新增：設置重載按鈕狀態
+        function setReloadButtonState(loading) {
+            const reloadBtn = document.getElementById('reloadBtn');
+            if (reloadBtn) {
+                reloadBtn.disabled = loading;
+                
+                if (loading) {
+                    reloadBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 載入中...';
+                } else {
+                    reloadBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 重新載入';
+                }
+            }
+        }
+
+        // 新增：更新最後更新時間
+        function updateLastUpdateTime() {
+            const now = new Date();
+            lastUpdateTime = now;
+            
+            const timeElement = document.getElementById('lastUpdateTime');
+            if (timeElement) {
+                // 格式化時間顯示
+                const timeString = now.toLocaleString('zh-TW', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                
+                timeElement.textContent = `${timeString}`;
+            }
+        }
+
+
 
         // 設定日期選擇器
         function setupDateSelector() {
@@ -151,14 +232,20 @@
                 updateWeekdayInfo();
                 generateTimeSlots();
                 updateStats();
+                
+                // 更新最後更新時間
+                updateLastUpdateTime();
+                
             } catch (error) {
                 console.error('更新顯示失敗:', error);
-                alert('載入資料失敗，請稍後重試');
+                showToast('載入資料失敗，請稍後重試', 'error');
+                throw error; // 重新拋出錯誤供 handleReload 處理
             } finally {
                 showLoading(false);
             }
         }
 
+        
         // 顯示/隱藏載入指示器
         function showLoading(show) {
             const loadingIndicator = document.getElementById('loadingIndicator');

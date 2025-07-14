@@ -150,8 +150,8 @@ opacity: 0.9;
 display: none;
 flex-direction: column;
 align-items: center;
-justify-content: center;
-padding: 60px 20px;
+justify-content: flex-start;
+padding: 20px 20px 60px;
 background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
 min-height: 400px;
 position: relative;
@@ -173,8 +173,6 @@ height: 80px;
 margin-bottom: 30px;
 }
 
-
-
 @keyframes spin {
 0% { transform: rotate(0deg); }
 100% { transform: rotate(360deg); }
@@ -189,6 +187,7 @@ font-size: 1.2em;
 font-weight: 600;
 margin-bottom: 20px;
 letter-spacing: 0.5px;
+margin-top: 10px;
 }
 
 .loading-text i {
@@ -457,4 +456,90 @@ padding: 15px;
 .stat-number {
 font-size: 1.5em;
 }
+}
+
+/* 最後更新時間和重載按鈕容器 */
+.update-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.last-update {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.last-update i {
+    font-size: 1em;
+    color: var(--primary-color);
+}
+
+.reload-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.reload-btn:hover {
+    background: #0085a0;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 151, 178, 0.3);
+}
+
+.reload-btn:active {
+    transform: translateY(0);
+}
+
+.reload-btn i {
+    font-size: 0.9em;
+    transition: transform 0.3s ease;
+}
+
+.reload-btn:hover i {
+    transform: rotate(180deg);
+}
+
+.reload-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.reload-btn:disabled i {
+    animation: spin 1s linear infinite;
+}
+
+/* 手機版響應式調整 */
+@media (max-width: 768px) {
+    .update-info {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .last-update {
+        justify-content: center;
+    }
+    
+    .reload-btn {
+        padding: 10px 20px;
+        font-size: 1em;
+    }
 }
