@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>搜尋預約</title>
+    <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="search.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fa-solid fa-car"></i>
+            <span>預約系統</span>
+        </div>
+        <div class="nav-links">
+            <a href="create.html" class="nav-link">建立預約</a>
+            <a href="#" class="nav-link active">搜尋預約</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 搜尋預約 -->
+        <div id="search" class="tab-content active">
+            <div class="search-bar">
+                <div class="form-group">
+                    <label for="searchType">搜尋類型</label>
+                    <select id="searchType">
+                        <option value="bookingNumber">預約編號</option>
+                        <option value="name">姓名</option>
+                        <option value="phone">電話</option>
+                        <option value="carPlate">車牌</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchTerm">搜尋關鍵字</label>
+                    <input type="text" id="searchTerm" placeholder="請輸入搜尋關鍵字...">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="searchBookings()">搜尋</button>
+            </div>
+
+            <div class="loading" id="searchLoading">
+                <div class="spinner"></div>
+                <p>搜尋中...</p>
+            </div>
+
+            <div id="searchResults" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+// Google Apps Script 部署網址
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwh9ZRl5Ao5PJk8sb0vq8UPJpgwrvU3K5Kh_4OcZwfoXtA8kI5Sdz0sBDKj8GLOf9nw/exec';
+
+// 顯示訊息
+function showMessage(message, type = 'success') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+    messageDiv.textContent = message;
+    
+    const searchDiv = document.getElementById('search');
+    searchDiv.insertBefore(messageDiv, searchDiv.firstChild);
+    
+    // 3秒後自動消失
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 3000);
+}
+
+// 使用 JSONP 方式調用 Google Apps Script API
+function callGAS(action, data = {}) {
+    return new Promise((resolve, reject) => {
+        // 創建唯一的回調函數名
+        const callbackName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        // 將回調函數附加到 window 對象
+        window[callbackName] = function(response) {
+            // 清理
+            document.head.removeChild(script);
+            delete window[callbackName];
+            
+            if (response.success !== undefined) {
+                resolve(response);
+            } else {
+                reject(new Error('無效的回應格式'));
+            }
+        };
+        
+        // 創建 script 標籤
+        const script = document.createElement('script');
+        
+        // 構建 URL 參數
+        const params = new URLSearchParams({
+            action: action,
+            data: JSON.stringify(data),
+            callback: callbackName
+        });
+        
+        script.src = `${GAS_URL}?${params.toString()}`;
+        
+        // 錯誤處理
+        script.onerror = function() {
+            document.head.removeChild(script);
+            delete window[callbackName];
+            reject(new Error('網路連接失敗'));
+        };
+        
+        // 添加到頁面
+        document.head.appendChild(script);
+        
+        // 設置超時
+        setTimeout(() => {
+            if (window[callbackName]) {
+                document.head.removeChild(script);
+                delete window[callbackName];
+                reject(new Error('請求超時'));
+            }
+        }, 30000); // 30秒超時
+    });
+}
+
+// 搜尋預約
+async function searchBookings() {
+    const searchTerm = document.getElementById('searchTerm').value;
+    const searchType = document.getElementById('searchType').value;
+    
+    if (!searchTerm.trim()) {
+        showMessage('請輸入搜尋關鍵字', 'error');
+        return;
+    }
+    
+    const loading = document.getElementById('searchLoading');
+    const results = document.getElementById('searchResults');
+    
+    loading.style.display = 'block';
+    results.innerHTML = '';
+    
+    try {
+        const result = await callGAS('searchBookings', {
+            searchTerm: searchTerm,
+            searchType: searchType
+        });
+        
+        loading.style.display = 'none';
+        
+        if (result.success) {
+            displaySearchResults(result.results);
+        } else {
+            showMessage(result.message, 'error');
+        }
+    } catch (error) {
+        loading.style.display = 'none';
+        showMessage('搜尋失敗：' + error.message, 'error');
+    }
+}
+
+// 顯示搜尋結果（簡化版，只顯示基本資訊和查看詳情按鈕）
+// 在搜尋頁面中，修改 displaySearchResults 函數
+function displaySearchResults(results) {
+    // 儲存搜尋結果到全域變數
+    window.searchResults = results;
+    
+    const resultsDiv = document.getElementById('searchResults');
+
+    if (results.length === 0) {
+        resultsDiv.innerHTML = '<p style="text-align: center; color: #666; font-size: 1.1rem;">沒有找到符合條件的預約</p>';
+        return;
+    }
+
+    resultsDiv.innerHTML = results.map(result => {
+        const data = result.data;
+        return `
+        <div class="result-item">
+            <div class="result-header">
+                <div class="booking-number">${data.預約編號}</div>
+                <div class="status ${
+                    data.狀態 === '已預約' ? 'confirmed' :
+                    data.狀態 === '已完成' ? 'completed' :
+                    'cancelled'
+                    }">
+                    ${data.狀態}
+                </div>
+            </div>
+            <div class="result-details">
+                <div class="detail-item">
+                    <div class="detail-label">姓名</div>
+                    <div class="detail-value">${result.data.姓名}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">電話</div>
+                    <div class="detail-value">${data.電話 || '-'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">車牌</div>
+                    <div class="detail-value">${data.車牌 || '-'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">預約日期</div>
+                    <div class="detail-value">${String(data.預約日期).slice(0, 10)}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">預約時段</div>
+                    <div class="detail-value">${formatTime(data.預約時段)}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">服務項目</div>
+                    <div class="detail-value">${data.服務項目 || '-'}</div>
+                </div>
+                ${data.備註 ? `<div><strong>備註</strong><br>${data.備註}</div>` : ''}
+            </div>
+            <div class="result-actions">
+                <button class="btn btn-primary" onclick="viewBookingDetail('${result.data.預約編號}')">修改</button>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+// 修改 viewBookingDetail 函數
+function viewBookingDetail(bookingNumber) {
+    // 找到對應的預約資料
+    const bookingData = window.searchResults?.find(result => result.data.預約編號 === bookingNumber);
+    
+    if (bookingData) {
+        // 將資料存到 window 物件中
+        window.currentBookingData = bookingData;
+    }
+    
+    // 跳轉到詳情頁面
+    window.location.href = `booking-detail.html?bookingNumber=${bookingNumber}`;
+}
+
+// 在詳情頁面的 loadBookingDetail 函數中：
+async function loadBookingDetail() {
+    const bookingNumber = getBookingNumberFromURL();
+    
+    if (!bookingNumber) {
+        showMessage('無效的預約編號', 'error');
+        return;
+    }
+    
+    // 先檢查是否有從搜尋頁面傳遞的資料
+    if (window.currentBookingData && window.currentBookingData.data.預約編號 === bookingNumber) {
+        originalBookingData = window.currentBookingData;
+        displayBookingDetail(originalBookingData);
+        document.getElementById('detailLoading').style.display = 'none';
+        // 清除暫存資料
+        delete window.currentBookingData;
+        return;
+    }
+    
+    // 如果沒有暫存資料，才進行 API 搜尋
+    const loading = document.getElementById('detailLoading');
+    const detail = document.getElementById('bookingDetail');
+    
+    loading.style.display = 'block';
+    detail.style.display = 'none';
+    
+    try {
+        const result = await callGAS('searchBookings', {
+            searchTerm: bookingNumber,
+            searchType: 'bookingNumber'
+        });
+        
+        loading.style.display = 'none';
+        
+        if (result.success && result.results.length > 0) {
+            originalBookingData = result.results[0];
+            displayBookingDetail(originalBookingData);
+        } else {
+            showMessage('找不到指定的預約', 'error');
+        }
+    } catch (error) {
+        loading.style.display = 'none';
+        showMessage('載入失敗：' + error.message, 'error');
+    }
+}
+
+
+function formatTime(value) {
+    if (!value) return '-';
+
+    // 若為 ISO 格式時間
+    const date = new Date(value);
+    if (isNaN(date)) return value;
+
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+// 查看預約詳情
+function viewBookingDetail(bookingNumber) {
+    // 跳轉到詳情頁面
+    window.location.href = `booking-detail.html?bookingNumber=${bookingNumber}`;
+}
+
+// 頁面載入後的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 搜尋框按Enter鍵觸發搜尋
+    const searchTermInput = document.getElementById('searchTerm');
+    if (searchTermInput) {
+        searchTermInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchBookings();
+            }
+        });
+    }
+});
+    </script>
+</body>
+</html>

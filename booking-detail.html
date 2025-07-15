@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>預約詳情</title>
+    <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="search.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fa-solid fa-car"></i>
+            <span>預約系統</span>
+        </div>
+        <div class="nav-links">
+            <a href="create.html" class="nav-link">建立預約</a>
+            <a href="search.html" class="nav-link">搜尋預約</a>
+            <a href="#" class="nav-link active">預約詳情</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="back-button">
+            <button class="btn btn-secondary" onclick="goBack()">
+                <i class="fa-solid fa-arrow-left"></i> 返回搜尋
+            </button>
+        </div>
+        
+        <br>
+
+        <div class="loading" id="detailLoading">
+            <div class="spinner"></div>
+            <p>載入中...</p>
+        </div>
+
+        <div id="bookingDetail" class="booking-detail" style="display: none;">
+            <!-- 預約詳情內容將在這裡動態載入 -->
+        </div>
+    </div>
+
+    <script>
+// Google Apps Script 部署網址
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwh9ZRl5Ao5PJk8sb0vq8UPJpgwrvU3K5Kh_4OcZwfoXtA8kI5Sdz0sBDKj8GLOf9nw/exec';
+
+// 全域變數來儲存原始資料
+let originalBookingData = null;
+let isEditMode = false;
+
+// 顯示訊息
+function showMessage(message, type = 'success') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+    messageDiv.textContent = message;
+    
+    const container = document.querySelector('.container');
+    container.insertBefore(messageDiv, container.firstChild);
+    
+    // 3秒後自動消失
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 3000);
+}
+
+// 使用 JSONP 方式調用 Google Apps Script API
+function callGAS(action, data = {}) {
+    return new Promise((resolve, reject) => {
+        // 創建唯一的回調函數名
+        const callbackName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        // 將回調函數附加到 window 對象
+        window[callbackName] = function(response) {
+            // 清理
+            document.head.removeChild(script);
+            delete window[callbackName];
+            
+            if (response.success !== undefined) {
+                resolve(response);
+            } else {
+                reject(new Error('無效的回應格式'));
+            }
+        };
+        
+        // 創建 script 標籤
+        const script = document.createElement('script');
+        
+        // 構建 URL 參數
+        const params = new URLSearchParams({
+            action: action,
+            data: JSON.stringify(data),
+            callback: callbackName
+        });
+        
+        script.src = `${GAS_URL}?${params.toString()}`;
+        
+        // 錯誤處理
+        script.onerror = function() {
+            document.head.removeChild(script);
+            delete window[callbackName];
+            reject(new Error('網路連接失敗'));
+        };
+        
+        // 添加到頁面
+        document.head.appendChild(script);
+        
+        // 設置超時
+        setTimeout(() => {
+            if (window[callbackName]) {
+                document.head.removeChild(script);
+                delete window[callbackName];
+                reject(new Error('請求超時'));
+            }
+        }, 30000); // 30秒超時
+    });
+}
+
+// 從 URL 獲取預約編號
+function getBookingNumberFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('bookingNumber');
+}
+
+// 載入預約詳情 - 修改後的版本
+async function loadBookingDetail() {
+    const bookingNumber = getBookingNumberFromURL();
+    
+    if (!bookingNumber) {
+        showMessage('無效的預約編號', 'error');
+        return;
+    }
+    
+    // 檢查是否有從搜尋頁面傳遞的資料
+    if (window.currentBookingData && window.currentBookingData.data.預約編號 === bookingNumber) {
+        originalBookingData = window.currentBookingData;
+        displayBookingDetail(originalBookingData);
+        document.getElementById('detailLoading').style.display = 'none';
+        delete window.currentBookingData;
+        return;
+    }
+    
+    // 檢查是否已經載入過相同的預約（避免重複載入）
+    if (originalBookingData && originalBookingData.data.預約編號 === bookingNumber) {
+        displayBookingDetail(originalBookingData);
+        document.getElementById('detailLoading').style.display = 'none';
+        return;
+    }
+    
+    // 進行 API 搜尋
+    const loading = document.getElementById('detailLoading');
+    const detail = document.getElementById('bookingDetail');
+    
+    loading.style.display = 'block';
+    detail.style.display = 'none';
+    
+    try {
+        const result = await callGAS('searchBookings', {
+            searchTerm: bookingNumber,
+            searchType: 'bookingNumber'
+        });
+        
+        loading.style.display = 'none';
+        
+        if (result.success && result.results.length > 0) {
+            originalBookingData = result.results[0];
+            displayBookingDetail(originalBookingData);
+        } else {
+            showMessage('找不到指定的預約', 'error');
+        }
+    } catch (error) {
+        loading.style.display = 'none';
+        showMessage('載入失敗：' + error.message, 'error');
+    }
+}
+
+// 顯示預約詳情
+function displayBookingDetail(booking) {
+    const detailDiv = document.getElementById('bookingDetail');
+    
+    detailDiv.innerHTML = `
+        <div class="result-item" id="bookingItem-${booking.data.預約編號}">
+            <div class="result-header">
+                <div class="booking-number">${booking.data.預約編號}</div>
+                <div class="status ${booking.data.狀態 === '已預約' ? 'confirmed' : 'cancelled'}">
+                    ${booking.data.狀態}
+                </div>
+            </div>
+            <div class="result-details" id="bookingDetails-${booking.data.預約編號}">
+                <div class="detail-item">
+                    <div class="detail-label">姓名</div>
+                    <div class="detail-value" id="name-${booking.data.預約編號}">${booking.data.姓名}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">電話</div>
+                    <div class="detail-value" id="phone-${booking.data.預約編號}">${booking.data.電話 || '-'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">車牌</div>
+                    <div class="detail-value" id="carPlate-${booking.data.預約編號}">${booking.data.車牌 || '-'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">預約日期</div>
+                    <div class="detail-value" id="date-${booking.data.預約編號}">${String(booking.data.預約日期).slice(0, 10)}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">預約時段</div>
+                    <div class="detail-value" id="time-${booking.data.預約編號}">${formatTime(booking.data.預約時段)}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">服務項目</div>
+                    <div class="detail-value" id="service-${booking.data.預約編號}">${booking.data.服務項目 || '-'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">狀態</div>
+                    <div class="detail-value" id="status-${booking.data.預約編號}">${booking.data.狀態}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">備註</div>
+                    <div class="detail-value" id="note-${booking.data.預約編號}">${booking.data.備註 || '-'}</div>
+                </div>
+            </div>
+            
+            <div class="result-actions" id="actions-${booking.data.預約編號}">
+                <button class="btn btn-secondary" onclick="toggleEditMode('${booking.data.預約編號}')">修改</button>
+                <button class="btn btn-danger" onclick="deleteBooking('${booking.data.預約編號}')">刪除</button>
+                <div class="loading-inline" id="loading-${booking.data.預約編號}" style="display:none;">
+                    <div class="spinner" style="width:16px; height:16px; border-width: 2px;"></div>
+                    <span>載入中...</span>
+                </div>
+            </div>
+            
+            <div class="edit-actions" id="editActions-${booking.data.預約編號}" style="display: none;">
+                <button class="btn btn-primary" onclick="saveChanges('${booking.data.預約編號}')">儲存</button>
+                <button class="btn btn-secondary" onclick="cancelEdit('${booking.data.預約編號}')">取消</button>
+            </div>
+        </div>
+    `;
+    
+    detailDiv.style.display = 'block';
+}
+
+// 切換編輯模式
+function toggleEditMode(bookingNumber) {
+    if (isEditMode) {
+        cancelEdit(bookingNumber);
+    } else {
+        enterEditMode(bookingNumber);
+    }
+}
+
+// 進入編輯模式
+function enterEditMode(bookingNumber) {
+    isEditMode = true;
+    const bookingItem = document.getElementById(`bookingItem-${bookingNumber}`);
+    const bookingDetails = document.getElementById(`bookingDetails-${bookingNumber}`);
+    const actions = document.getElementById(`actions-${bookingNumber}`);
+    const editActions = document.getElementById(`editActions-${bookingNumber}`);
+    
+    bookingItem.classList.add('edit-mode');
+    actions.style.display = 'none';
+    editActions.style.display = 'flex';
+    
+    // 轉換各個欄位為編輯模式
+    convertToEditField('name', bookingNumber, originalBookingData.data.姓名);
+    convertToEditField('phone', bookingNumber, originalBookingData.data.電話);
+    convertToEditField('carPlate', bookingNumber, originalBookingData.data.車牌);
+    convertToEditField('date', bookingNumber, originalBookingData.data.預約日期);
+    convertToEditField('time', bookingNumber, originalBookingData.data.預約時段);
+    convertToEditField('service', bookingNumber, originalBookingData.data.服務項目);
+    convertToEditField('status', bookingNumber, originalBookingData.data.狀態);
+    convertToEditField('note', bookingNumber, originalBookingData.data.備註);
+}
+
+// 轉換欄位為編輯模式
+function convertToEditField(fieldName, bookingNumber, value) {
+    const element = document.getElementById(`${fieldName}-${bookingNumber}`);
+    if (!element) return;
+    
+    let inputHtml = '';
+    const today = new Date().toISOString().split('T')[0];
+    
+    switch (fieldName) {
+        case 'name':
+            inputHtml = `<input type="text" value="${value || ''}" id="edit-${fieldName}-${bookingNumber}">`;
+            break;
+        case 'phone':
+            inputHtml = `<input type="tel" value="${value || ''}" id="edit-${fieldName}-${bookingNumber}">`;
+            break;
+        case 'carPlate':
+            inputHtml = `<input type="text" value="${value || ''}" id="edit-${fieldName}-${bookingNumber}">`;
+            break;
+        case 'date':
+            const dateValue = value ? String(value).slice(0, 10) : '';
+            inputHtml = `<input type="date" value="${dateValue}" min="${today}" id="edit-${fieldName}-${bookingNumber}">`;
+            break;
+        case 'time':
+            // 處理從 Google Sheets 來的 Date 對象
+            let timeValue = '';
+            if (value) {
+                if (typeof value === 'string') {
+                    // 如果是字符串，可能是 ISO 格式或 HH:MM 格式
+                    if (value.includes('T')) {
+                        // ISO 格式，轉換為 HH:MM
+                        const date = new Date(value);
+                        if (!isNaN(date)) {
+                            const hours = String(date.getHours()).padStart(2, '0');
+                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                            timeValue = `${hours}:${minutes}`;
+                        }
+                    } else {
+                        // 已經是 HH:MM 格式
+                        timeValue = value;
+                    }
+                } else {
+                    // 如果是 Date 對象，直接格式化
+                    timeValue = formatTime(value);
+                }
+            }
+            console.log('Time value for select:', timeValue); // 調試用
+            
+            inputHtml = `
+                <select id="edit-${fieldName}-${bookingNumber}">
+                    <option value="">請選擇時段</option>
+                    <option value="08:00" ${timeValue === '08:00' ? 'selected' : ''}>08:00</option>
+                    <option value="08:30" ${timeValue === '08:30' ? 'selected' : ''}>08:30</option>
+                    <option value="09:00" ${timeValue === '09:00' ? 'selected' : ''}>09:00</option>
+                    <option value="09:30" ${timeValue === '09:30' ? 'selected' : ''}>09:30</option>
+                    <option value="10:00" ${timeValue === '10:00' ? 'selected' : ''}>10:00</option>
+                    <option value="10:30" ${timeValue === '10:30' ? 'selected' : ''}>10:30</option>
+                    <option value="11:00" ${timeValue === '11:00' ? 'selected' : ''}>11:00</option>
+                    <option value="13:30" ${timeValue === '13:30' ? 'selected' : ''}>13:30</option>
+                    <option value="14:00" ${timeValue === '14:00' ? 'selected' : ''}>14:00</option>
+                    <option value="14:30" ${timeValue === '14:30' ? 'selected' : ''}>14:30</option>
+                    <option value="15:00" ${timeValue === '15:00' ? 'selected' : ''}>15:00</option>
+                    <option value="15:30" ${timeValue === '15:30' ? 'selected' : ''}>15:30</option>
+                    <option value="16:00" ${timeValue === '16:00' ? 'selected' : ''}>16:00</option>
+                    <option value="16:30" ${timeValue === '16:30' ? 'selected' : ''}>16:30</option>
+                </select>
+            `;
+            break;
+        case 'service':
+            inputHtml = `
+                <select id="edit-${fieldName}-${bookingNumber}">
+                    <option value="">請選擇服務項目</option>
+                    <option value="保養" ${value === '保養' ? 'selected' : ''}>保養</option>
+                    <option value="維修" ${value === '維修' ? 'selected' : ''}>維修</option>
+                    <option value="其他" ${value === '其他' ? 'selected' : ''}>其他</option>
+                </select>
+            `;
+            break;
+        case 'status':
+            inputHtml = `
+                <select id="edit-${fieldName}-${bookingNumber}">
+                    <option value="已預約" ${value === '已預約' ? 'selected' : ''}>已預約</option>
+                    <option value="已取消" ${value === '已取消' ? 'selected' : ''}>已取消</option>
+                </select>
+            `;
+            break;
+        case 'note':
+            inputHtml = `<textarea id="edit-${fieldName}-${bookingNumber}">${value || ''}</textarea>`;
+            break;
+    }
+    
+    element.innerHTML = inputHtml;
+}
+
+// 取消編輯
+function cancelEdit(bookingNumber) {
+    isEditMode = false;
+    displayBookingDetail(originalBookingData);
+}
+
+// 修改 saveChanges 函數，避免重複搜尋
+async function saveChanges(bookingNumber) {
+    const updateData = {
+        name: document.getElementById(`edit-name-${bookingNumber}`).value,
+        phone: document.getElementById(`edit-phone-${bookingNumber}`).value,
+        date: document.getElementById(`edit-date-${bookingNumber}`).value,
+        time: document.getElementById(`edit-time-${bookingNumber}`).value,
+        carPlate: document.getElementById(`edit-carPlate-${bookingNumber}`).value,
+        service: document.getElementById(`edit-service-${bookingNumber}`).value,
+        status: document.getElementById(`edit-status-${bookingNumber}`).value,
+        note: document.getElementById(`edit-note-${bookingNumber}`).value
+    };
+    
+    // 簡單驗證
+    if (!updateData.name.trim()) {
+        showMessage('請輸入姓名', 'error');
+        return;
+    }
+    
+    if (!updateData.date) {
+        showMessage('請選擇預約日期', 'error');
+        return;
+    }
+    
+    if (!updateData.time) {
+        showMessage('請選擇預約時段', 'error');
+        return;
+    }
+    
+    // 顯示儲存中的 Loading 畫面
+    showSaveLoading(bookingNumber, true);
+    
+    try {
+        const result = await callGAS('updateBooking', {
+            bookingNumber: bookingNumber,
+            updateData: updateData
+        });
+        
+        showSaveLoading(bookingNumber, false);
+        
+        if (result.success) {
+            showMessage(`預約 ${bookingNumber} 修改成功！`, 'success');
+            isEditMode = false;
+            
+            // 方案1：直接更新本地資料，避免重複搜尋
+            updateLocalBookingData(updateData);
+            displayBookingDetail(originalBookingData);
+            
+            // 方案2：如果需要重新載入，可以設置暫存資料
+            // window.currentBookingData = originalBookingData;
+            // loadBookingDetail();
+        } else {
+            showMessage(result.message, 'error');
+        }
+    } catch (error) {
+        showSaveLoading(bookingNumber, false);
+        showMessage('修改失敗：' + error.message, 'error');
+    }
+}
+
+function formatTime(value) {
+    if (!value) return '-';
+
+    // 若為 ISO 格式時間
+    const date = new Date(value);
+    if (isNaN(date)) return value;
+
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+// 返回搜尋頁面
+function goBack() {
+    window.history.back();
+}
+
+// 新增函數：更新本地資料
+function updateLocalBookingData(updateData) {
+    if (originalBookingData && originalBookingData.data) {
+        // 更新本地暫存的資料
+        originalBookingData.data.姓名 = updateData.name;
+        originalBookingData.data.電話 = updateData.phone;
+        originalBookingData.data.預約日期 = updateData.date;
+        originalBookingData.data.預約時段 = updateData.time;
+        originalBookingData.data.車牌 = updateData.carPlate;
+        originalBookingData.data.服務項目 = updateData.service;
+        originalBookingData.data.狀態 = updateData.status;
+        originalBookingData.data.備註 = updateData.note;
+    }
+}
+
+// 顯示儲存中的 Loading 畫面
+function showSaveLoading(bookingNumber, isLoading) {
+    const editActionsDiv = document.getElementById(`editActions-${bookingNumber}`);
+    const saveButton = editActionsDiv.querySelector('button');
+    const cancelButton = editActionsDiv.querySelectorAll('button')[1];
+    
+    if (isLoading) {
+        saveButton.innerHTML = '儲存中...';
+        saveButton.disabled = true;
+        cancelButton.disabled = true;
+    } else {
+        saveButton.innerHTML = '儲存';
+        saveButton.disabled = false;
+        cancelButton.disabled = false;
+    }
+}
+
+// 取消預約
+async function cancelBooking(bookingNumber) {
+    if (confirm(`確定要取消預約 ${bookingNumber} 嗎？`)) {
+        setLoading(bookingNumber, true);
+        
+        try {
+            const result = await callGAS('cancelBooking', {
+                bookingNumber: bookingNumber
+            });
+            
+            setLoading(bookingNumber, false);
+            
+            if (result.success) {
+                showMessage(`預約 ${bookingNumber} 已取消`, 'success');
+                
+                // 更新本地資料而不是重新搜尋
+                if (originalBookingData && originalBookingData.data) {
+                    originalBookingData.data.狀態 = '已取消';
+                    displayBookingDetail(originalBookingData);
+                }
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (error) {
+            setLoading(bookingNumber, false);
+            showMessage('取消失敗：' + error.message, 'error');
+        }
+    }
+}
+
+// 刪除預約
+async function deleteBooking(bookingNumber) {
+    if (confirm(`確定要刪除預約 ${bookingNumber} 嗎？此操作無法復原！`)) {
+        setLoading(bookingNumber, true);
+        
+        try {
+            const result = await callGAS('deleteBooking', {
+                bookingNumber: bookingNumber
+            });
+            
+            setLoading(bookingNumber, false);
+            
+            if (result.success) {
+                showMessage(`預約 ${bookingNumber} 已刪除`, 'success');
+                
+                // 刪除成功後返回搜尋頁面
+                setTimeout(() => {
+                    window.location.href = 'search.html';
+                }, 2000);
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (error) {
+            setLoading(bookingNumber, false);
+            showMessage('刪除失敗：' + error.message, 'error');
+        }
+    }
+}
+
+function setLoading(bookingNumber, isLoading) {
+    const loadingDiv = document.getElementById(`loading-${bookingNumber}`);
+    const actionsDiv = document.getElementById(`actions-${bookingNumber}`);
+    const editActionsDiv = document.getElementById(`editActions-${bookingNumber}`);
+
+    if (loadingDiv) {
+        if (isLoading) {
+            loadingDiv.style.display = 'inline-flex';
+            // 按鈕都禁用避免重複點擊
+            if (actionsDiv) {
+                actionsDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            }
+            if (editActionsDiv) {
+                editActionsDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            }
+        } else {
+            loadingDiv.style.display = 'none';
+            if (actionsDiv) {
+                actionsDiv.querySelectorAll('button').forEach(btn => btn.disabled = false);
+            }
+            if (editActionsDiv) {
+                editActionsDiv.querySelectorAll('button').forEach(btn => btn.disabled = false);
+            }
+        }
+    }
+}
+
+// 頁面載入後自動載入預約詳情
+document.addEventListener('DOMContentLoaded', function() {
+    loadBookingDetail();
+});
+    </script>
+</body>
+</html>

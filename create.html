@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>建立預約</title>
+    <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="create.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fa-solid fa-car"></i>
+            <span>預約系統</span>
+        </div>
+        <div class="nav-links">
+            <a href="#" class="nav-link active">建立預約</a>
+            <a href="search.html" class="nav-link">搜尋預約</a>
+        </div>
+    </nav>
+
+    <div class="container">
+
+        <!-- 新增預約表單 -->
+        <div id="create">
+            <form id="createForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">姓名</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">電話</label>
+                        <input type="tel" id="phone" name="phone">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date">預約日期</label>
+                        <input type="date" id="date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="time">預約時段</label>
+                        <select id="time" name="time" required>
+                            <option value="">請選擇時段</option>
+                            <option value="08:00">08:00</option>
+                            <option value="08:30">08:30</option>
+                            <option value="09:00">09:00</option>
+                            <option value="09:30">09:30</option>
+                            <option value="10:00">10:00</option>
+                            <option value="10:30">10:30</option>
+                            <option value="11:00">11:00</option>
+                            <option disabled>───────</option>
+                            <option value="13:30">13:30</option>
+                            <option value="14:00">14:00</option>
+                            <option value="14:30">14:30</option>
+                            <option value="15:00">15:00</option>
+                            <option value="15:30">15:30</option>
+                            <option value="16:00">16:00</option>
+                            <option value="16:30">16:30</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="carPlate">車牌</label>
+                        <input type="text" id="carPlate" name="carPlate" placeholder="例如：ABC-1234">
+                    </div>
+                    <div class="form-group">
+                        <label for="service">服務項目</label>
+                        <select id="service" name="service">
+                            <option value="">請選擇服務項目</option>
+                            <option value="保養">保養</option>
+                            <option value="維修">維修</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="note">備註</label>
+                    <textarea id="note" name="note" style="margin-top:5px" placeholder="請輸入其他需要說明的事項..."></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: center;">
+                    <button type="submit" class="btn btn-primary">建立預約</button>
+                </div>
+            </form>
+
+            <div class="loading" id="createLoading" style="display: none;">
+                <div class="spinner"></div>
+                <p>建立中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Google Apps Script 部署網址
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbwh9ZRl5Ao5PJk8sb0vq8UPJpgwrvU3K5Kh_4OcZwfoXtA8kI5Sdz0sBDKj8GLOf9nw/exec';
+
+        // 顯示訊息
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            
+            // 在表單上方顯示訊息
+            const container = document.querySelector('.container');
+            container.parentNode.insertBefore(messageDiv, container);
+
+            
+            // 3秒後自動消失
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        // 使用 JSONP 方式調用 Google Apps Script API
+        function callGAS(action, data = {}) {
+            return new Promise((resolve, reject) => {
+                // 創建唯一的回調函數名
+                const callbackName = 'gasCallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                // 將回調函數附加到 window 對象
+                window[callbackName] = function(response) {
+                    // 清理
+                    document.head.removeChild(script);
+                    delete window[callbackName];
+                    
+                    if (response.success !== undefined) {
+                        resolve(response);
+                    } else {
+                        reject(new Error('無效的回應格式'));
+                    }
+                };
+                
+                // 創建 script 標籤
+                const script = document.createElement('script');
+                
+                // 構建 URL 參數
+                const params = new URLSearchParams({
+                    action: action,
+                    data: JSON.stringify(data),
+                    callback: callbackName
+                });
+                
+                script.src = `${GAS_URL}?${params.toString()}`;
+                
+                // 錯誤處理
+                script.onerror = function() {
+                    document.head.removeChild(script);
+                    delete window[callbackName];
+                    reject(new Error('網路連接失敗'));
+                };
+                
+                // 添加到頁面
+                document.head.appendChild(script);
+                
+                // 設置超時
+                setTimeout(() => {
+                    if (window[callbackName]) {
+                        document.head.removeChild(script);
+                        delete window[callbackName];
+                        reject(new Error('請求超時'));
+                    }
+                }, 30000); // 30秒超時
+            });
+        }
+
+        // 新增預約
+        document.getElementById('createForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const form = document.getElementById('createForm');
+            const loading = document.getElementById('createLoading');
+            
+            // 隱藏表單並顯示載入動畫
+            form.style.display = 'none';
+            loading.style.display = 'block';
+
+            const formData = new FormData(e.target);
+            const bookingData = {
+                name: formData.get('name') || '',
+                phone: formData.get('phone') || '',
+                date: String(formData.get('date') || '').slice(0, 10),
+                time: String(formData.get('time') || '').slice(0, 5),
+                carPlate: formData.get('carPlate') || '',
+                service: formData.get('service') || '',
+                note: formData.get('note') || ''
+            };
+
+            try {
+                const result = await callGAS('createBooking', bookingData);
+
+                if (result.success) {
+                    showMessage('預約新增成功！預約編號：' + result.bookingNumber, 'success');
+                    e.target.reset();
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('預約新增失敗：' + error.message, 'error');
+            } finally {
+                // 恢復表單顯示並隱藏載入動畫
+                form.style.display = 'block';
+                loading.style.display = 'none';
+            }
+        });
+
+        // 頁面載入後的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 設置今天作為預約日期的最小值
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('date');
+            if (dateInput) {
+                dateInput.min = today;
+            }
+        });
+    </script>
+</body>
+</html>
