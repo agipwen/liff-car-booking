@@ -21,7 +21,6 @@
 
         <!-- 新增預約 -->
         <div id="create" class="tab-content active">
-            <h2>新增預約</h2>
             <form id="createForm">
                 <div class="form-row">
                     <div class="form-group">
@@ -83,7 +82,10 @@
                     <textarea id="note" name="note" style="margin-top:5px" placeholder="請輸入其他需要說明的事項..."></textarea>
                 </div>
 
-                <button type="submit" class="btn btn-primary">建立預約</button>
+                <div style="display: flex; justify-content: center;">
+                    <button type="submit" class="btn btn-primary">建立預約</button>
+                </div>
+
             </form>
 
             <div class="loading" id="createLoading" style="display: none;">
@@ -94,7 +96,6 @@
 
         <!-- 搜尋預約 -->
         <div id="search" class="tab-content">
-            <h2>搜尋預約</h2>
             <div class="search-bar">
                 <div class="form-group">
                     <label for="searchType">搜尋類型</label>
