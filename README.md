@@ -55,8 +55,8 @@
 | 前端 | HTML / CSS（部署於 GitHub Pages） |
 | 後端 | Google Apps Script（GAS） |
 | 資料庫 | Google Sheets |
-| 通訊介面 | LINE Messaging API / LIFF |
-| 通知服務 | LINE Notify |
+| 介面 | LINE Messaging API / LIFF |
+| 通知服務 | LINE Bot |
 
 ### 📂 Googlesheet分頁儲存
 
