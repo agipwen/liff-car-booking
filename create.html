@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>建立預約</title>
     <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="create.css">
 </head>
 <body>
@@ -26,8 +27,8 @@
             <form id="createForm">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="name">姓名</label>
-                        <input type="text" id="name" name="name" required>
+                        <label for="name">姓名 <span style="color: #999; font-size: 0.9em;">(姓名或車牌至少填寫一項)</span></label>
+                        <input type="text" id="name" name="name">
                     </div>
                     <div class="form-group">
                         <label for="phone">電話</label>
@@ -65,7 +66,7 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="carPlate">車牌</label>
+                        <label for="carPlate">車牌 <span style="color: #999; font-size: 0.9em;">(姓名或車牌至少填寫一項)</span></label>
                         <input type="text" id="carPlate" name="carPlate" placeholder="例如：ABC-1234">
                     </div>
                     <div class="form-group">
@@ -99,23 +100,6 @@
     <script>
         // Google Apps Script 部署網址
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbwh9ZRl5Ao5PJk8sb0vq8UPJpgwrvU3K5Kh_4OcZwfoXtA8kI5Sdz0sBDKj8GLOf9nw/exec';
-
-        // 顯示訊息
-        function showMessage(message, type = 'success') {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            messageDiv.textContent = message;
-            
-            // 在表單上方顯示訊息
-            const container = document.querySelector('.container');
-            container.parentNode.insertBefore(messageDiv, container);
-
-            
-            // 3秒後自動消失
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 3000);
-        }
 
         // 使用 JSONP 方式調用 Google Apps Script API
         function callGAS(action, data = {}) {
@@ -173,6 +157,21 @@
         document.getElementById('createForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            const formData = new FormData(e.target);
+            const name = formData.get('name') || '';
+            const carPlate = formData.get('carPlate') || '';
+
+            // 驗證姓名或車牌至少填寫一項
+            if (!name.trim() && !carPlate.trim()) {
+                Swal.fire({
+                    title: '驗證失敗',
+                    text: '請至少填寫姓名或車牌其中一項',
+                    icon: 'warning',
+                    confirmButtonText: '確定'
+                });
+                return;
+            }
+
             const form = document.getElementById('createForm');
             const loading = document.getElementById('createLoading');
             
@@ -180,13 +179,12 @@
             form.style.display = 'none';
             loading.style.display = 'block';
 
-            const formData = new FormData(e.target);
             const bookingData = {
-                name: formData.get('name') || '',
+                name: name,
                 phone: formData.get('phone') || '',
                 date: String(formData.get('date') || '').slice(0, 10),
                 time: String(formData.get('time') || '').slice(0, 5),
-                carPlate: formData.get('carPlate') || '',
+                carPlate: carPlate,
                 service: formData.get('service') || '',
                 note: formData.get('note') || ''
             };
@@ -195,13 +193,28 @@
                 const result = await callGAS('createBooking', bookingData);
 
                 if (result.success) {
-                    showMessage('預約新增成功！預約編號：' + result.bookingNumber, 'success');
+                    await Swal.fire({
+                        title: '預約成功！',
+                        text: '預約編號：' + result.bookingNumber,
+                        icon: 'success',
+                        confirmButtonText: '確定'
+                    });
                     e.target.reset();
                 } else {
-                    showMessage(result.message, 'error');
+                    await Swal.fire({
+                        title: '預約失敗',
+                        text: result.message,
+                        icon: 'error',
+                        confirmButtonText: '確定'
+                    });
                 }
             } catch (error) {
-                showMessage('預約新增失敗：' + error.message, 'error');
+                await Swal.fire({
+                    title: '預約失敗',
+                    text: error.message,
+                    icon: 'error',
+                    confirmButtonText: '確定'
+                });
             } finally {
                 // 恢復表單顯示並隱藏載入動畫
                 form.style.display = 'block';
