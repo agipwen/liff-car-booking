@@ -127,14 +127,7 @@
                     console.log('LINE 使用者 ID:', lineUserId);
                     console.log('LINE 使用者資訊:', lineUserProfile);
                     console.log('管理員名稱:', adminUserName);
-                    
-                    // 自動填入姓名（如果有的話）
-                    if (lineUserProfile.displayName) {
-                        const nameInput = document.getElementById('name');
-                        if (nameInput && !nameInput.value) {
-                            nameInput.value = lineUserProfile.displayName;
-                        }
-                    }
+                
                 } else {
                     // 如果未登入，進行登入
                     liff.login();
