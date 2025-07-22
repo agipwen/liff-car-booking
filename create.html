@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>建立預約</title>
+    <title>新增預約</title>
     <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- 加入 LIFF SDK -->
@@ -106,6 +106,7 @@
         // 儲存 LINE 使用者資訊
         let lineUserId = null;
         let lineUserProfile = null;
+        let adminUserName = null; // 新增變數儲存管理員名稱
 
         // 初始化 LIFF
         async function initLiff() {
@@ -120,8 +121,12 @@
                     lineUserProfile = await liff.getProfile();
                     lineUserId = lineUserProfile.userId;
                     
+                    // 建立管理員名稱：管理員_ + LINE 使用者名稱
+                    adminUserName = '管理員_' + (lineUserProfile.displayName || 'LINE用戶');
+                    
                     console.log('LINE 使用者 ID:', lineUserId);
                     console.log('LINE 使用者資訊:', lineUserProfile);
+                    console.log('管理員名稱:', adminUserName);
                     
                     // 自動填入姓名（如果有的話）
                     if (lineUserProfile.displayName) {
@@ -224,7 +229,7 @@
             loading.style.display = 'block';
 
             const bookingData = {
-                userId: lineUserId, // 加入 LINE User ID
+                userId: adminUserName, // 改為使用管理員名稱
                 name: name,
                 phone: formData.get('phone') || '',
                 date: String(formData.get('date') || '').slice(0, 10),
