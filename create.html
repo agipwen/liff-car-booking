@@ -6,6 +6,8 @@
     <title>建立預約</title>
     <script src="https://kit.fontawesome.com/ca83b2e10a.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- 加入 LIFF SDK -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <link rel="stylesheet" href="create.css">
 </head>
 <body>
@@ -15,13 +17,12 @@
             <span>預約系統</span>
         </div>
         <div class="nav-links">
-            <a href="#" class="nav-link active">建立預約</a>
+            <a href="#" class="nav-link active">新增預約</a>
             <a href="search.html" class="nav-link">搜尋預約</a>
         </div>
     </nav>
 
     <div class="container">
-
         <!-- 新增預約表單 -->
         <div id="create">
             <form id="createForm">
@@ -101,6 +102,48 @@
     <script>
         // Google Apps Script 部署網址
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbwh9ZRl5Ao5PJk8sb0vq8UPJpgwrvU3K5Kh_4OcZwfoXtA8kI5Sdz0sBDKj8GLOf9nw/exec';
+        
+        // 儲存 LINE 使用者資訊
+        let lineUserId = null;
+        let lineUserProfile = null;
+
+        // 初始化 LIFF
+        async function initLiff() {
+            try {
+                await liff.init({
+                    liffId: "YOUR_LIFF_ID" // 請替換為你的 LIFF ID
+                });
+
+                // 檢查是否已登入
+                if (liff.isLoggedIn()) {
+                    // 取得使用者資訊
+                    lineUserProfile = await liff.getProfile();
+                    lineUserId = lineUserProfile.userId;
+                    
+                    console.log('LINE 使用者 ID:', lineUserId);
+                    console.log('LINE 使用者資訊:', lineUserProfile);
+                    
+                    // 自動填入姓名（如果有的話）
+                    if (lineUserProfile.displayName) {
+                        const nameInput = document.getElementById('name');
+                        if (nameInput && !nameInput.value) {
+                            nameInput.value = lineUserProfile.displayName;
+                        }
+                    }
+                } else {
+                    // 如果未登入，進行登入
+                    liff.login();
+                }
+            } catch (error) {
+                console.error('LIFF 初始化失敗:', error);
+                Swal.fire({
+                    title: '初始化失敗',
+                    text: 'LINE 登入初始化失敗，請重新整理頁面',
+                    icon: 'error',
+                    confirmButtonText: '確定'
+                });
+            }
+        }
 
         // 使用 JSONP 方式調用 Google Apps Script API
         function callGAS(action, data = {}) {
@@ -181,6 +224,7 @@
             loading.style.display = 'block';
 
             const bookingData = {
+                userId: lineUserId, // 加入 LINE User ID
                 name: name,
                 phone: formData.get('phone') || '',
                 date: String(formData.get('date') || '').slice(0, 10),
@@ -201,6 +245,11 @@
                         confirmButtonText: '確定'
                     });
                     e.target.reset();
+                    
+                    // 重新填入使用者名稱
+                    if (lineUserProfile && lineUserProfile.displayName) {
+                        document.getElementById('name').value = lineUserProfile.displayName;
+                    }
                 } else {
                     await Swal.fire({
                         title: '預約失敗',
@@ -225,6 +274,9 @@
 
         // 頁面載入後的初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 初始化 LIFF
+            initLiff();
+            
             // 設置今天作為預約日期的最小值
             const today = new Date().toISOString().split('T')[0];
             const dateInput = document.getElementById('date');
